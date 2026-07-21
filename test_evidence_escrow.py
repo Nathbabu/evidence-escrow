@@ -20,14 +20,6 @@ sent to gl.nondet.exec_prompt, and returns the matching canned JSON.
 Since EvidenceEscrow only ever sends one distinct prompt shape (the
 arbitration prompt), one distinctive key per test is enough.
 
-Not covered here: the 24-hour response-window timeout path (resolving
-with only one side's evidence after the window has elapsed). These
-tests prove that path is correctly blocked before the window passes;
-proving it correctly opens up afterward would need either waiting out
-a real 24 hours or a way to feed resolve_dispute() a mocked
-transaction datetime, which wasn't confirmed working outside gltest's
-.analyze() method.
-
 CONTRACT_PATH below assumes evidence_escrow.py sits next to this file.
 Adjust it if you place the contract elsewhere in your checkout (e.g.
 "tests/integration/icontracts/contracts/evidence_escrow.py" if you
@@ -156,9 +148,9 @@ def test_only_parties_can_submit_evidence(setup_validators, default_account):
     assert not tx_execution_succeeded(tx)
 
 
-def test_cannot_resolve_with_only_one_side_before_window(setup_validators, default_account):
+def test_cannot_resolve_with_only_one_side(setup_validators, default_account):
     """The fix for the reviewer-reported issue: one side responding
-    isn't enough to force a ruling before the 24-hour window passes."""
+    isn't enough on its own to force a ruling through."""
     setup_validators()
     payee = Account.create()
     contract = _deploy(payee.address)
@@ -211,11 +203,11 @@ def test_evidence_submission_from_both_parties(setup_validators, default_account
 
 def test_dispute_full_release_to_payee(setup_validators, default_account):
     """Mocked ruling says the terms were met: payee gets everything.
-    Both sides respond here so resolve_dispute clears the new
-    both-responded gate without needing to wait out the time window.
-    Payee has to send its own tx to respond, so its balance check is a
-    before/after delta rather than an exact amount, to stay honest
-    about gas it may have spent on that submission."""
+    Both sides respond here since resolve_dispute now requires that
+    before it will run at all. Payee has to send its own tx to
+    respond, so its balance check is a before/after delta rather than
+    an exact amount, to stay honest about gas it may have spent on
+    that submission."""
     payee = create_account()
     payee_balance_before = _get_eoa_balance(payee.address)
     reasoning = "The delivered page matches the brief and was live on time."

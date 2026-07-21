@@ -4,6 +4,14 @@ A two-party escrow where the release condition is written in plain
 language instead of code, and disputes are settled by GenLayer
 validators reading the evidence rather than by a deterministic check.
 
+**Revision note:** a reviewer flagged that the original version let
+either party trigger a final ruling the instant they submitted
+evidence, with no guarantee the other side had a chance to respond.
+`resolve_dispute()` now requires both sides to have responded, or a
+24-hour response window to have passed, before it can proceed. See
+"How a dispute gets resolved" and "Known limitations" below for the
+details.
+
 ## Why this needs to be an Intelligent Contract
 
 A normal EVM contract can only evaluate things it can compute
@@ -41,7 +49,9 @@ AwaitingFunding --fund()--------------> Funded
                                                     (either side, updates
                                                      their own slot)
                                                        |
-                                          resolve_dispute()
+                                    resolve_dispute(): only once both
+                                    sides have responded, or the 24-hour
+                                    response window has passed
                                                        |
                                                        v
                                                    Resolved
@@ -57,23 +67,29 @@ happens.
 1. Either party calls `submit_evidence(evidence, evidence_url="")`.
    `evidence` is their free-text account of what happened.
    `evidence_url` is optional: a live preview link, a merged PR, a
-   delivery-tracking page, anything checkable.
-2. `resolve_dispute()` fetches whichever URLs were provided with
-   `gl.nondet.web.render(url, mode="text")`, the same primitive
-   GenLayer's own prediction-market example uses, and builds one
-   prompt containing the terms, both sides' written claims, and
-   whatever was fetched.
-3. That whole step (fetch + prompt) runs inside a single closure
+   delivery-tracking page, anything checkable. The first submission
+   also records the current time as when the dispute opened.
+2. `resolve_dispute()` first checks that either both sides have
+   submitted evidence, or that 24 hours have passed since the dispute
+   opened. This is the guardrail against one party settling the case
+   before the other has had a real chance to answer, while still
+   giving the case a way to close if someone never responds at all.
+3. Once that gate clears, `resolve_dispute()` fetches whichever URLs
+   were provided with `gl.nondet.web.render(url, mode="text")`, the
+   same primitive GenLayer's own prediction-market example uses, and
+   builds one prompt containing the terms, both sides' written claims,
+   and whatever was fetched.
+4. That whole step (fetch + prompt) runs inside a single closure
    passed to `gl.eq_principle.prompt_comparative`, matching the
    pattern in GenLayer's own web-fetching examples: the fetch and the
    judgment are one non-deterministic unit that validators agree on
    together, not two separate consensus rounds.
-4. The model returns `payer_refund_percent` as one of five fixed
+5. The model returns `payer_refund_percent` as one of five fixed
    values (0/25/50/75/100) rather than an arbitrary number. This is
    deliberate: independent validators are far more likely to land on
    the same bucket than the same exact percentage, which matters for
    consensus actually finalizing instead of repeatedly disagreeing.
-5. Funds split accordingly via `gl.get_contract_at(address).emit_transfer(value=...)`.
+6. Funds split accordingly via `gl.get_contract_at(address).emit_transfer(value=...)`.
 
 **Why one prompt instead of a per-source-then-aggregate pipeline**
 (the pattern GenLayer's `IntelligentOracle` contract uses for
@@ -102,14 +118,19 @@ level rather than a structural allow-list.
 | `__init__(payee, terms)` | deployer (becomes payer) | Set up the deal |
 | `fund()` — payable | payer | Deposit the escrowed amount, once |
 | `confirm_complete()` | payer | Release full balance, no dispute |
-| `submit_evidence(evidence, evidence_url="")` | payer or payee | Record your side; first call opens the dispute |
-| `resolve_dispute()` | payer or payee | Trigger the AI-arbitrated ruling |
-| `get_terms/get_status/get_parties/get_balance/get_evidence/get_ruling` | anyone | Read-only state |
+| `submit_evidence(evidence, evidence_url="")` | payer or payee | Record your side; first call opens the dispute and starts the response window |
+| `resolve_dispute()` | payer or payee | Trigger the AI-arbitrated ruling, once both sides responded or the window passed |
+| `get_terms/get_status/get_dispute_opened_at/get_parties/get_balance/get_evidence/get_ruling` | anyone | Read-only state |
 
 ## Verified in Studio
 
 Both paths were deployed and run end to end in GenLayer Studio, not
-just checked against reference syntax:
+just checked against reference syntax. This section predates the
+response-window fix below, so it confirms the mechanics that fix
+didn't touch: funding, the transfer logic, the web fetch, and the
+consensus math. The response-window gate itself is new and needs its
+own fresh deploy to confirm, which is the next step, not something
+already checked off.
 
 - **Happy path**: deploy → `fund(100 GEN)` → `confirm_complete()` →
   `get_status()` returned `"Released"`, `get_balance()` returned `0`.
@@ -123,21 +144,22 @@ just checked against reference syntax:
   `0`, matching a full refund. Three of five validators, running three
   different underlying providers (OpenAI, MiniMax, Anthropic),
   independently agreed before quorum, at which point the protocol
-  cancelled the remaining two validators. Optimistic Democracy and the
-  model-diversity argument both worked as described above, not just
-  asserted on paper.
+  cancelled the remaining two validators. That's Optimistic Democracy
+  and the model-diversity argument actually holding up under a real
+  run, rather than staying a claim on paper.
 - This also confirms the one thing that couldn't be checked from
   reading example code alone: `u256` correctly supports the
   multiplication and floor-division used in the refund-split math.
 
 ## Known limitations
 
-- **No evidence window / time lock.** `resolve_dispute()` can be
-  called the instant either party submits evidence, even if the other
-  side hasn't had a chance to respond yet. A production version would
-  probably add a minimum waiting period, but that needs a block-time
-  API this build doesn't rely on since it wasn't confirmed against a
-  working example.
+- **The response window's timeout path is untested against a real
+  clock.** `resolve_dispute()` is confirmed to correctly block when
+  only one side has responded and no time has passed (that's covered
+  by an automated test). What isn't yet confirmed against live Studio
+  is the other half: that it correctly proceeds on one-sided evidence
+  once the full 24 hours have actually elapsed. That's a genuinely
+  slow thing to verify by hand and wasn't done as part of this pass.
 - **No domain allow-list**, discussed above. An intentional scope
   decision for a generic primitive, not an oversight, but worth
   revisiting for any deployment where the deal has a known, narrow set
@@ -148,8 +170,8 @@ just checked against reference syntax:
 `test_evidence_escrow.py` is written against GenLayer's `gltest`
 framework and follows the same conventions as
 `genlayer-simulator/tests/integration/icontracts/tests/`. These are
-integration tests, they need a locally running GenLayer Studio/simulator
-instance, not just a bare `pip install`.
+integration tests that need a locally running GenLayer Studio/simulator
+instance behind them; a bare `pip install` alone won't run them.
 
 ```bash
 # from inside a genlayer-simulator checkout, with the local stack running
@@ -174,4 +196,6 @@ Every syntax pattern here was checked against GenLayer's own
 `gl.Contract` base class, the `@gl.public.write/.view/.payable`
 decorators, `gl.nondet.exec_prompt`, `gl.nondet.web.render`,
 `gl.eq_principle.prompt_comparative`, `gl.get_contract_at(...).emit_transfer(...)`,
-and the `gltest` conventions in the test file.
+and the `gltest` conventions in the test file. The response-window fix
+added `gl.message.raw["datetime"]`, confirmed against GenLayer's
+official SDK API reference (sdk.genlayer.com) rather than inferred.

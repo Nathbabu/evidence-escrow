@@ -17,13 +17,16 @@ Flow:
   3b. Dispute path: either side calls submit_evidence() with their
       account of what happened, optionally including a URL (a delivery
       page, a live preview, a merged PR) for the contract to fetch as
-      supporting evidence. Either side then calls resolve_dispute().
-      GenLayer validators read the terms, both sides' written claims,
-      and anything fetched from their links, then rule on what share
-      of the funds the payer gets back.
+      supporting evidence. Once both sides have submitted, either can
+      call resolve_dispute() right away. If only one side responds,
+      resolve_dispute() waits out a 24-hour response window before it
+      can proceed on that one side's evidence alone, so neither party
+      can force a ruling before the other has had a real chance to
+      answer, and the case still isn't stuck forever if someone never
+      responds at all.
 
-Design note on why resolution is one holistic prompt rather than a
-per-source-then-aggregate pipeline: this is adversarial two-party
+Design note on why resolution runs as one combined prompt rather than
+a per-source-then-aggregate pipeline: this is adversarial two-party
 arbitration, not multi-source reconciliation. An arbitrator needs to
 weigh both sides' arguments against each other in one pass; judging
 each side in isolation first and combining the verdicts afterward
@@ -32,9 +35,19 @@ would throw away the comparison that actually makes a ruling fair.
 
 from genlayer import *
 
+import datetime
 import json
 import re
 import typing
+
+RESPONSE_WINDOW_SECONDS = 24 * 60 * 60
+
+
+def _parse_datetime(raw: str) -> datetime.datetime:
+    """GenVM reports transaction time as an ISO 8601 string ending in
+    'Z'; swap that for an explicit UTC offset so fromisoformat parses
+    it the same way across Python versions."""
+    return datetime.datetime.fromisoformat(raw.replace("Z", "+00:00"))
 
 
 class EvidenceEscrow(gl.Contract):
@@ -48,6 +61,7 @@ class EvidenceEscrow(gl.Contract):
     payee_evidence_url: str
     payer_refund_percent: u256
     ruling_reasoning: str
+    dispute_opened_at: str
 
     def __init__(self, payee: str, terms: str):
         """
@@ -65,6 +79,7 @@ class EvidenceEscrow(gl.Contract):
         self.payee_evidence_url = ""
         self.payer_refund_percent = u256(0)
         self.ruling_reasoning = ""
+        self.dispute_opened_at = ""
 
     @gl.public.write.payable
     def fund(self) -> None:
@@ -94,8 +109,9 @@ class EvidenceEscrow(gl.Contract):
         """
         Either party records their side of the story, plus an optional
         link the contract can fetch as supporting evidence. The first
-        submission moves the contract from Funded into Disputed.
-        Calling again overwrites that party's previous submission.
+        submission moves the contract from Funded into Disputed and
+        starts the 24-hour response window. Calling again overwrites
+        that party's previous submission.
         """
         sender = gl.message.sender_address
         if sender != self.payer and sender != self.payee:
@@ -112,6 +128,7 @@ class EvidenceEscrow(gl.Contract):
 
         if self.status == "Funded":
             self.status = "Disputed"
+            self.dispute_opened_at = gl.message.raw["datetime"]
 
     @gl.public.write
     def resolve_dispute(self) -> dict[str, typing.Any]:
@@ -123,12 +140,28 @@ class EvidenceEscrow(gl.Contract):
         unstructured arguments and a live web page takes an LLM, and
         trusting that judgment takes GenLayer's validator consensus
         instead of one model's unchecked opinion.
+
+        Requires either both sides to have submitted evidence, or the
+        24-hour response window to have elapsed since the dispute
+        opened, so a resolution can't be forced through before the
+        other side has had a real chance to answer.
         """
         sender = gl.message.sender_address
         if sender != self.payer and sender != self.payee:
             raise gl.vm.UserError("Only the payer or payee can request resolution")
         if self.status != "Disputed":
             raise gl.vm.UserError(f"Cannot resolve while status is {self.status}")
+
+        both_responded = bool(self.payer_evidence) and bool(self.payee_evidence)
+        if not both_responded:
+            opened = _parse_datetime(self.dispute_opened_at)
+            now = _parse_datetime(gl.message.raw["datetime"])
+            elapsed = (now - opened).total_seconds()
+            if elapsed < RESPONSE_WINDOW_SECONDS:
+                raise gl.vm.UserError(
+                    "Waiting for the other side to respond, or for the "
+                    "24-hour response window to pass"
+                )
 
         terms = self.terms
         payer_evidence = self.payer_evidence or "(no written evidence submitted)"
@@ -229,6 +262,10 @@ by a JSON parser without errors.
     @gl.public.view
     def get_status(self) -> str:
         return self.status
+
+    @gl.public.view
+    def get_dispute_opened_at(self) -> str:
+        return self.dispute_opened_at
 
     @gl.public.view
     def get_parties(self) -> dict[str, str]:

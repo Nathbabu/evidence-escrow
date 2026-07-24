@@ -4,19 +4,33 @@ A two-party escrow where the release condition is written in plain
 language instead of code, and disputes are settled by GenLayer
 validators reading the evidence rather than by a deterministic check.
 
-**Revision note:** a reviewer flagged that the original version let
-either party trigger a final ruling the instant they submitted
-evidence, with no guarantee the other side had a chance to respond.
-The first attempt at a fix added a 24-hour response-window fallback
-using `gl.message.raw["datetime"]`, which looked correct against
-GenLayer's official SDK docs but turned out to be a newer API than the
-runtime this contract is actually pinned to (`v0.2.16`); it failed on
-every validator with `AttributeError: 'MessageType' object has no
-attribute 'raw'` the moment it was actually deployed. `resolve_dispute()`
-now requires both sides to have responded, full stop, no clock
-involved, which the reviewer had explicitly said was an acceptable fix
-on its own. See "How a dispute gets resolved" and "Known limitations"
-below.
+**Revision note:** this went through three rounds of review.
+
+Round 1: a reviewer flagged that the original version let either
+party trigger a final ruling the instant they submitted evidence,
+with no guarantee the other side had a chance to respond. The fix
+added a 24-hour response-window fallback using
+`gl.message.raw["datetime"]`, which looked correct against GenLayer's
+official SDK docs but turned out to be a newer API than the runtime
+this contract is actually pinned to (`v0.2.16`); it failed on every
+validator with `AttributeError: 'MessageType' object has no attribute
+'raw'` the moment it was actually deployed. That got walked back to a
+simpler fix: `resolve_dispute()` requiring both sides to have
+responded, full stop, no clock involved.
+
+Round 2: a reviewer pointed out the obvious tradeoff in that
+simplification, a silent counterparty could now lock the funds up
+forever. This time, instead of trusting documentation again, the
+actual runtime got interrogated directly with a throwaway probe
+contract that ran `dir()` across the relevant `gl` namespaces. That
+turned up `gl.message_raw`, a separate top-level name, not the
+`gl.message.raw` attribute path that failed before, and confirmed it
+returns a working ISO 8601 `datetime` string. `resolve_dispute()` now
+requires either both sides to have responded, or a 24-hour response
+window to have passed, using that confirmed-working access path.
+
+See "How a dispute gets resolved" and "Verified in Studio" below for
+the details of both attempts.
 
 ## Why this needs to be an Intelligent Contract
 
@@ -56,7 +70,8 @@ AwaitingFunding --fund()--------------> Funded
                                                      their own slot)
                                                        |
                                     resolve_dispute(): only once both
-                                    sides have submitted evidence
+                                    sides have responded, or the 24-hour
+                                    response window has passed
                                                        |
                                                        v
                                                    Resolved
@@ -72,10 +87,13 @@ happens.
 1. Either party calls `submit_evidence(evidence, evidence_url="")`.
    `evidence` is their free-text account of what happened.
    `evidence_url` is optional: a live preview link, a merged PR, a
-   delivery-tracking page, anything checkable.
-2. `resolve_dispute()` first checks that both sides have actually
-   submitted evidence. This is the guardrail against one party
-   settling the case before the other has had a real chance to answer.
+   delivery-tracking page, anything checkable. The first submission
+   also records the current time as when the dispute opened.
+2. `resolve_dispute()` first checks that either both sides have
+   submitted evidence, or that 24 hours have passed since the dispute
+   opened. This is the guardrail against one party settling the case
+   before the other has had a real chance to answer, while still
+   giving the case a way to close if someone never responds at all.
 3. Once that gate clears, `resolve_dispute()` fetches whichever URLs
    were provided with `gl.nondet.web.render(url, mode="text")`, the
    same primitive GenLayer's own prediction-market example uses, and
@@ -120,20 +138,21 @@ level rather than a structural allow-list.
 | `__init__(payee, terms)` | deployer (becomes payer) | Set up the deal |
 | `fund()` — payable | payer | Deposit the escrowed amount, once |
 | `confirm_complete()` | payer | Release full balance, no dispute |
-| `submit_evidence(evidence, evidence_url="")` | payer or payee | Record your side; first call opens the dispute |
-| `resolve_dispute()` | payer or payee | Trigger the AI-arbitrated ruling, once both sides responded |
-| `get_terms/get_status/get_parties/get_balance/get_evidence/get_ruling` | anyone | Read-only state |
+| `submit_evidence(evidence, evidence_url="")` | payer or payee | Record your side; first call opens the dispute and starts the response window |
+| `resolve_dispute()` | payer or payee | Trigger the AI-arbitrated ruling, once both sides responded or the window passed |
+| `get_terms/get_status/get_dispute_opened_at/get_parties/get_balance/get_evidence/get_ruling` | anyone | Read-only state |
 
 ## Verified in Studio
 
-Both paths were deployed and run end to end in GenLayer Studio, not
-just checked against reference syntax. This section predates both
-rounds of the response-window fix, so it confirms the mechanics
-neither round touched: funding, the transfer logic, the web fetch, and
-the consensus math. The current both-sides-required gate is simple
-enough (a plain check on two string fields, nothing new) that it
-should behave the same, but hasn't had its own fresh deploy yet; that
-redeploy is the next step, not something already checked off.
+Both the happy path and the original dispute path were actually
+deployed and run end to end in GenLayer Studio, real execution
+backing these claims rather than a syntax check alone. This section predates the current response-window logic, so
+it confirms the mechanics that logic doesn't touch: funding, the
+transfer logic, the web fetch, and the consensus math. The
+`gl.message_raw["datetime"]` access itself is separately confirmed
+below, via direct probe, but the full both-or-timeout gate hasn't had
+its own end-to-end redeploy yet; that's the next step, not something
+already checked off.
 
 - **Happy path**: deploy → `fund(100 GEN)` → `confirm_complete()` →
   `get_status()` returned `"Released"`, `get_balance()` returned `0`.
@@ -157,20 +176,29 @@ redeploy is the next step, not something already checked off.
   `gl.message.raw["datetime"]`) was deployed and it failed cleanly:
   every validator agreed on the same `AttributeError`, confirming that
   attribute doesn't exist on this runtime rather than something
-  flakier. That attempt was dropped in favor of the simpler
-  both-required gate described above.
+  flakier.
+- Before writing the second attempt, a throwaway probe contract (not
+  part of this submission) was deployed and called to run `dir()`
+  across `gl`, `gl.message`, `gl.vm`, and related namespaces directly.
+  That's what surfaced `gl.message_raw` as a working, separate name,
+  and confirmed by direct call that `gl.message_raw["datetime"]`
+  returns a real ISO 8601 string (`2026-07-24T20:50:14.809500Z` in
+  the actual test call) on this exact runtime, real output rather
+  than documentation written for a different one. The current
+  response-window logic is built on that confirmed result.
 
 ## Known limitations
 
-- **A silent counterparty can leave funds stuck.** Since
-  `resolve_dispute()` now requires both sides to have submitted
-  evidence, a party who simply never responds means the dispute can
-  never be resolved, and the escrowed funds stay locked in the
-  contract indefinitely. A time-based escape hatch (resolve on
-  one-sided evidence after a response window passes) would fix this,
-  but needs a working way to read elapsed time inside a contract on
-  this specific runtime version, which wasn't available; see the
-  revision note above for what was actually tried.
+- **The response window's timeout path is untested against a real
+  clock.** `resolve_dispute()` is confirmed to correctly block when
+  only one side has responded and no time has passed (that's covered
+  by an automated test), and `gl.message_raw["datetime"]` is confirmed
+  to return a real value (via direct probe). What isn't yet confirmed
+  end to end is the combination: that resolution actually proceeds on
+  one-sided evidence once the full 24 hours have genuinely elapsed.
+  That needs either waiting out a real 24 hours in Studio or a way to
+  feed the test suite a mocked transaction datetime, neither of which
+  was done as part of this pass.
 - **No domain allow-list**, discussed above. An intentional scope
   decision for a generic primitive, not an oversight, but worth
   revisiting for any deployment where the deal has a known, narrow set
@@ -215,8 +243,16 @@ was checked against GenLayer's official SDK API reference
 (sdk.genlayer.com) and looked solid, but that reference documents the
 current development branch, not the specific pinned runtime
 (`v0.2.16`) this contract actually depends on, and the two don't fully
-match. It failed the moment it was deployed for real. Matching a
-claim against official docs isn't the same as matching it against the
-exact version in the `Depends` header, and this contract no longer
-uses anything that wasn't confirmed the harder way, against an actual
-example running on this exact runtime.
+match. It failed the moment it was deployed for real. Matching a claim
+against official docs isn't the same as matching it against the exact
+version in the `Depends` header.
+
+The correction came from empirical testing rather than better
+documentation: a throwaway probe contract called `dir()` directly
+against the live runtime's `gl`, `gl.message`, and `gl.vm` namespaces
+and reported back the real results. That's what surfaced
+`gl.message_raw` (a separate top-level name, not an attribute of
+`gl.message`) and confirmed `gl.message_raw["datetime"]` actually
+returns a usable value on this exact runtime. That confirmed result,
+not a second reading of the docs, is what the current timeout logic
+is built on.

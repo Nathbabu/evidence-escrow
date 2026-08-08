@@ -32,6 +32,15 @@ window to have passed, using that confirmed-working access path.
 See "How a dispute gets resolved" and "Verified in Studio" below for
 the details of both attempts.
 
+**Later addition:** `cancel_deal()` was added after the contract had
+already been reviewed and accepted, as part of building the frontend
+around it. Real usage surfaced a real gap the original review didn't
+need to cover: no way to back out of a deal created by mistake, or one
+both sides agreed to settle outside the contract. Added with the same
+one rule that keeps it safe: it stops working the moment the payee has
+submitted evidence, so it can never be used to make a live claim
+disappear.
+
 ## Why this needs to be an Intelligent Contract
 
 A normal EVM contract can only evaluate things it can compute
@@ -58,29 +67,33 @@ prose even when they agree on the outcome.
 
 ```
 AwaitingFunding --fund()--------------> Funded
-                                            |
-                          confirm_complete()|  submit_evidence()
-                                            |         |
-                                            v         v
-                                       Released    Disputed <--+
-                                                       |        |
-                                                       +--------+
-                                                    submit_evidence()
-                                                    (either side, updates
-                                                     their own slot)
-                                                       |
-                                    resolve_dispute(): only once both
-                                    sides have responded, or the 24-hour
-                                    response window has passed
-                                                       |
-                                                       v
-                                                   Resolved
+       |                                    |
+       | cancel_deal()      confirm_complete()|  submit_evidence()
+       |                                    |         |
+       v                                    v         v
+   Cancelled <---------------------    Released    Disputed <--+
+       ^                    |                          |        |
+       |  cancel_deal()     |                          +--------+
+       |  (only while       |                       submit_evidence()
+       |   payee hasn't     |                       (either side, updates
+       |   submitted yet)   |                        their own slot)
+       +--------------------+                          |
+                                       resolve_dispute(): only once both
+                                       sides have responded, or the 24-hour
+                                       response window has passed
+                                                          |
+                                                          v
+                                                      Resolved
 ```
 
-Every transition is access-controlled: only the payer can `fund()` or
-`confirm_complete()`; only the payer or payee can `submit_evidence()`
-or `resolve_dispute()`; anyone else is rejected before any LLM call
-happens.
+Every transition is access-controlled: only the payer can `fund()`,
+`confirm_complete()`, or `cancel_deal()`; only the payer or payee can
+`submit_evidence()` or `resolve_dispute()`; anyone else is rejected
+before any LLM call happens. `cancel_deal()` has one extra rule beyond
+sender-checking: it stops being available the moment the payee has
+submitted their own evidence, since at that point the payee has a real
+claim in play and a unilateral payer exit would defeat the whole point
+of having a dispute path at all.
 
 ## How a dispute gets resolved
 
@@ -138,6 +151,7 @@ level rather than a structural allow-list.
 | `__init__(payee, terms)` | deployer (becomes payer) | Set up the deal |
 | `fund()` — payable | payer | Deposit the escrowed amount, once |
 | `confirm_complete()` | payer | Release full balance, no dispute |
+| `cancel_deal()` | payer | Call off the deal, full refund if funded; blocked once payee has submitted evidence |
 | `submit_evidence(evidence, evidence_url="")` | payer or payee | Record your side; first call opens the dispute and starts the response window |
 | `resolve_dispute()` | payer or payee | Trigger the AI-arbitrated ruling, once both sides responded or the window passed |
 | `get_terms/get_status/get_dispute_opened_at/get_parties/get_balance/get_evidence/get_ruling` | anyone | Read-only state |

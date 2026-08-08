@@ -24,6 +24,15 @@ Flow:
       can force a ruling before the other has had a real chance to
       answer, and the case still isn't stuck forever if someone never
       responds at all.
+  3c. Cancel path: payer calls cancel_deal() to call off a deal that
+      was created by mistake, or where both sides agreed to sort
+      things out elsewhere. Available any time before the payee has
+      submitted evidence, funded or not; a full refund goes out if it
+      was funded. Once the payee has actually responded to a dispute
+      with their own account, this closes for good, since the payee
+      has a real claim in play by then, and letting the payer make it
+      disappear unilaterally would defeat the whole point of the
+      dispute path.
 
 Design note on why resolution runs as one combined prompt rather than
 a per-source-then-aggregate pipeline: this is adversarial two-party
@@ -103,6 +112,33 @@ class EvidenceEscrow(gl.Contract):
         self.status = "Released"
         if amount > u256(0):
             gl.get_contract_at(self.payee).emit_transfer(value=amount)
+
+    @gl.public.write
+    def cancel_deal(self) -> None:
+        """
+        Payer calls off the deal. Allowed any time before the payee has
+        submitted evidence: unfunded, funded, or mid-dispute with only
+        the payer having spoken so far. A full refund goes out if funds
+        are already in escrow. Once the payee has responded with their
+        own evidence, this is no longer available; the case has a real
+        claim in it at that point and has to run its normal course,
+        resolve_dispute() or the response window, not a unilateral
+        payer exit.
+        """
+        if gl.message.sender_address != self.payer:
+            raise gl.vm.UserError("Only the payer can cancel this deal")
+        allowed = self.status in ("AwaitingFunding", "Funded") or (
+            self.status == "Disputed" and not self.payee_evidence
+        )
+        if not allowed:
+            raise gl.vm.UserError(
+                "Cannot cancel once the payee has submitted evidence; "
+                "the case has to resolve or reach the response window instead"
+            )
+        amount = self.balance
+        self.status = "Cancelled"
+        if amount > u256(0):
+            gl.get_contract_at(self.payer).emit_transfer(value=amount)
 
     @gl.public.write
     def submit_evidence(self, evidence: str, evidence_url: str = "") -> None:

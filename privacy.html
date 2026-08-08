@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Privacy — EvidenceEscrow</title>
+<meta name="description" content="A short, honest note on what this site does and doesn't do with your data." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav class="site-nav">
+  <div class="nav-top-row">
+    <a class="logo-mark" href="index.html">
+      <img src="images/logo.png" alt="" width="28" height="28" />
+      <span class="logo-text">
+        EvidenceEscrow
+        <span class="logo-tag">on GenLayer</span>
+      </span>
+    </a>
+    <div class="nav-actions">
+      <div class="history-area">
+        <button class="history-btn" id="historyBtn">My deals</button>
+        <div class="history-panel" id="historyPanel"></div>
+      </div>
+      <div class="wallet-area">
+        <button class="wallet-btn" id="walletBtn">Connect wallet</button>
+        <div class="wallet-menu" id="walletMenu">
+          <button id="switchAcctBtn">Switch account</button>
+          <hr/>
+          <button class="danger" id="disconnectBtn">Disconnect</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="nav-links">
+    <a href="about.html">How it works</a>
+    <a href="docs.html">Docs</a>
+    <a href="privacy.html" class="current">Privacy</a>
+  </div>
+</nav>
+
+<article class="prose">
+  <p class="eyebrow" style="display:flex; justify-content:space-between; align-items:center;">
+    <span>Privacy</span>
+    <a href="index.html" class="back-home-link">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>
+      Back to homepage
+    </a>
+  </p>
+  <h1>Privacy policy</h1>
+  <p class="lede">EvidenceEscrow is a static site that runs entirely in your browser and talks directly to GenLayer's public testnet. There is no backend server, no account system, and no company database behind it.</p>
+
+  <h2>Information we collect</h2>
+  <p>We don't collect any personal information. There are no forms, no sign-ups, no email addresses, and no analytics or tracking scripts anywhere on this site.</p>
+
+  <h2>Cookies</h2>
+  <p>This site does not use cookies.</p>
+
+  <h2>Local storage</h2>
+  <p>Your "My deals" list is saved in your browser's local storage, on your device only. It is never transmitted anywhere and is not accessible to us. Clearing your browser data removes it.</p>
+
+  <h2>On-chain data</h2>
+  <p>Deal terms, addresses, submitted evidence, and rulings are read directly from GenLayer's public testnet. This information is public by nature of how a blockchain works, not something this site chooses to publish, and it is equally accessible to anyone querying the same contract address directly.</p>
+
+  <h2>Wallet connections</h2>
+  <p>Connecting a wallet (such as MetaMask) lets this site request transactions for you to review and approve. Your private key and seed phrase remain in your wallet extension at all times and are never transmitted to or seen by this site.</p>
+
+  <h2>Contact</h2>
+  <p>Questions about this policy can be directed through the project's <a href="https://github.com/Nathbabu/evidence-escrow" target="_blank" rel="noopener">GitHub repository</a>.</p>
+</article>
+
+<div class="toast-stack" id="toasts"></div>
+
+<script type="module" src="header.js"></script>
+</body>
+</html>

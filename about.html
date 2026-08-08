@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>How it works — EvidenceEscrow</title>
+<meta name="description" content="How EvidenceEscrow uses GenLayer's Intelligent Contracts and validator consensus to arbitrate two-party disputes." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav class="site-nav">
+  <div class="nav-top-row">
+    <a class="logo-mark" href="index.html">
+      <img src="images/logo.png" alt="" width="28" height="28" />
+      <span class="logo-text">
+        EvidenceEscrow
+        <span class="logo-tag">on GenLayer</span>
+      </span>
+    </a>
+    <div class="nav-actions">
+      <div class="history-area">
+        <button class="history-btn" id="historyBtn">My deals</button>
+        <div class="history-panel" id="historyPanel"></div>
+      </div>
+      <div class="wallet-area">
+        <button class="wallet-btn" id="walletBtn">Connect wallet</button>
+        <div class="wallet-menu" id="walletMenu">
+          <button id="switchAcctBtn">Switch account</button>
+          <hr/>
+          <button class="danger" id="disconnectBtn">Disconnect</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="nav-links">
+    <a href="about.html" class="current">How it works</a>
+    <a href="docs.html">Docs</a>
+    <a href="privacy.html">Privacy</a>
+  </div>
+</nav>
+
+<article class="prose">
+  <p class="eyebrow" style="display:flex; justify-content:space-between; align-items:center;">
+    <span>How it works</span>
+    <a href="index.html" class="back-home-link">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>
+      Back to homepage
+    </a>
+  </p>
+  <h1>Why this needs to be an Intelligent Contract</h1>
+  <p class="lede">A normal smart contract can only check things it can compute with certainty: balances, timestamps, signatures. It has no way to read "the homepage doesn't match the brief, here's why" and decide whether that's true. That takes actual language understanding, which is exactly what GenLayer's Intelligent Contracts add.</p>
+
+  <p><code>resolve_dispute()</code> calls a large language model in the middle of executing, specifically for that judgment, and the escrowed funds move according to what it decides. Take that step out and there's no contract left worth having, the AI reasoning isn't a feature bolted onto otherwise-deterministic logic, it's the actual mechanism deciding who gets paid.</p>
+
+  <h2>Consensus, not one model's opinion</h2>
+  <p>Trusting a single AI's read on something this consequential isn't good enough on its own, and that's the real problem GenLayer's consensus solves. The ruling is wrapped in an equivalence check: a Lead Validator proposes a split, and several Co-Validators, often running different underlying models entirely, independently check whether they'd land on the same number. Only if enough of them agree does it finalize.</p>
+  <p>That matters because it makes the ruling resistant to any one model's quirks or a cleverly-worded attempt to manipulate it. A prompt engineered to fool one model has to fool several genuinely different ones at once, which is a much harder thing to pull off by accident or on purpose.</p>
+
+  <h2>The response window</h2>
+  <p>Early on, this contract let either side trigger a final ruling the instant they submitted evidence, with no guarantee the other side had a chance to answer. That's a real flaw, since a ruling made on one side's word alone isn't arbitration, it's just whoever moves first winning by default.</p>
+  <p>The fix: resolution only runs once both sides have responded, or 24 hours have passed since the dispute opened, whichever comes first. That guarantees a real window to respond, while still making sure the case isn't stuck forever if someone simply goes silent.</p>
+
+  <h2>Cancelling, but only while it's still fair</h2>
+  <p>Deals get created by mistake, or both sides sometimes agree to sort things out outside the contract entirely. <code>cancel_deal()</code> exists for exactly that: the payer can call it off any time before funding, after funding, or even mid-dispute if the payee hasn't answered yet, and a full refund goes out automatically if funds were already in escrow.</p>
+  <p>That last condition, before the payee has answered, is the one rule that actually matters. The moment the payee submits their own evidence, they've made a real claim, and letting the payer make the case quietly disappear at that point would let a payer who's about to lose simply opt out instead. So the window closes there for good: past that point, the case runs its normal course, an actual ruling or the response window, not a unilateral exit.</p>
+
+  <h2>Evidence, not instructions</h2>
+  <p>Either party can attach a link as supporting evidence, a delivered page, a merged pull request, a delivery-tracking page, and the contract fetches it live and hands the content to the validators. That's genuinely useful, real proof beats a written claim. But it also means a bad-faith party could host a page containing text aimed directly at the arbitrator, trying to talk it into a favorable ruling.</p>
+  <p>The prompt is explicit about this: fetched content is evidence to weigh, not instructions to follow. Anything on a linked page that addresses the model directly, claims special authority, or asks it to ignore its instructions gets treated as exactly what it is, a submission from an interested party, not a trusted source.</p>
+
+  <h2>Five outcomes, not fifty</h2>
+  <p>Rulings land on one of five values: 0, 25, 50, 75, or 100 percent refunded to the payer, never an arbitrary number like 43%. That's deliberate. Independent validators, each running their own reasoning, are far more likely to converge on the same bucket than on the exact same integer, and consensus needs that agreement to actually finalize instead of stalling out on validators disagreeing by a point or two.</p>
+
+  <p style="margin-top:40px;"><a href="docs.html">Read the technical reference →</a></p>
+</article>
+
+<div class="toast-stack" id="toasts"></div>
+
+<script type="module" src="header.js"></script>
+</body>
+</html>

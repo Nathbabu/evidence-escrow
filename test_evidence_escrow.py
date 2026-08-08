@@ -209,6 +209,110 @@ def test_evidence_submission_from_both_parties(setup_validators, default_account
     assert evidence["payee_evidence_url"] == "https://example.com/proof"
 
 
+def test_cancel_before_funding(setup_validators, default_account):
+    """Cancel with nothing ever deposited: just a state change, no
+    transfer should be triggered at all."""
+    setup_validators()
+    payee = Account.create()
+    contract = _deploy(payee.address)
+
+    tx = contract.cancel_deal(args=[]).transact(
+        wait_transaction_status=TransactionStatus.FINALIZED
+    )
+    assert tx_execution_succeeded(tx)
+    assert contract.get_status(args=[]).call() == "Cancelled"
+
+
+def test_cancel_after_funding_refunds_payer(setup_validators, default_account):
+    """Cancel with funds already in escrow: full refund goes back to
+    the payer, checked as a real balance delta, not just a status flip."""
+    setup_validators()
+    payee = Account.create()
+    contract = _deploy(payee.address)
+    payer_balance_before = _get_eoa_balance(default_account.address)
+
+    contract.fund(args=[]).transact(
+        value=1000, wait_transaction_status=TransactionStatus.FINALIZED
+    )
+    tx = contract.cancel_deal(args=[]).transact(
+        wait_transaction_status=TransactionStatus.FINALIZED,
+        wait_triggered_transactions=True,
+        wait_triggered_transactions_status=TransactionStatus.ACCEPTED,
+    )
+    assert tx_execution_succeeded(tx)
+    assert contract.get_status(args=[]).call() == "Cancelled"
+    assert contract.get_balance(args=[]).call() == 0
+    # delta, not exact amount, since the payer also paid gas on fund() and cancel_deal()
+    assert _get_eoa_balance(default_account.address) > payer_balance_before - 1000
+
+
+def test_cancel_with_only_payer_evidence(setup_validators, default_account):
+    """Dispute has started, but only the payer has spoken so far;
+    cancelling should still be allowed."""
+    setup_validators()
+    payee = Account.create()
+    contract = _deploy(payee.address)
+
+    contract.fund(args=[]).transact(
+        value=1000, wait_transaction_status=TransactionStatus.FINALIZED
+    )
+    contract.submit_evidence(args=["Having second thoughts about this deal.", ""]).transact(
+        wait_transaction_status=TransactionStatus.FINALIZED
+    )
+    assert contract.get_status(args=[]).call() == "Disputed"
+
+    tx = contract.cancel_deal(args=[]).transact(
+        wait_transaction_status=TransactionStatus.FINALIZED,
+        wait_triggered_transactions=True,
+        wait_triggered_transactions_status=TransactionStatus.ACCEPTED,
+    )
+    assert tx_execution_succeeded(tx)
+    assert contract.get_status(args=[]).call() == "Cancelled"
+
+
+def test_cannot_cancel_after_payee_evidence(setup_validators, default_account):
+    """The security-relevant case: once the payee has responded with
+    their own evidence, the payer can no longer make the case
+    disappear. This is the whole reason the cutoff exists, so it gets
+    its own dedicated test, not just a side effect of another one."""
+    setup_validators()
+    payee = create_account()  # needs to send its own tx to respond
+    contract = _deploy(payee.address)
+
+    contract.fund(args=[]).transact(
+        value=1000, wait_transaction_status=TransactionStatus.FINALIZED
+    )
+    contract.submit_evidence(args=["Not sure this was delivered.", ""]).transact(
+        wait_transaction_status=TransactionStatus.FINALIZED
+    )
+    contract.connect(payee).submit_evidence(
+        args=["It was delivered, here's proof.", "https://example.com/proof"]
+    ).transact(wait_transaction_status=TransactionStatus.FINALIZED)
+
+    tx = contract.cancel_deal(args=[]).transact(
+        wait_transaction_status=TransactionStatus.FINALIZED
+    )
+    assert not tx_execution_succeeded(tx)
+    # still disputed, funds still in escrow, nothing was quietly cancelled out from under the payee
+    assert contract.get_status(args=[]).call() == "Disputed"
+    assert contract.get_balance(args=[]).call() == 1000
+
+
+def test_only_payer_can_cancel(setup_validators, default_account):
+    setup_validators()
+    payee = Account.create()
+    stranger = create_account()
+    contract = _deploy(payee.address)
+
+    tx = (
+        contract.connect(stranger)
+        .cancel_deal(args=[])
+        .transact(wait_transaction_status=TransactionStatus.FINALIZED)
+    )
+    assert not tx_execution_succeeded(tx)
+    assert contract.get_status(args=[]).call() == "AwaitingFunding"
+
+
 def test_dispute_full_release_to_payee(setup_validators, default_account):
     """Mocked ruling says the terms were met: payee gets everything.
     Both sides respond here so resolve_dispute clears the both-

@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Docs — EvidenceEscrow</title>
+<meta name="description" content="Technical reference for the EvidenceEscrow contract: public interface, state machine, and source." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav class="site-nav">
+  <div class="nav-top-row">
+    <a class="logo-mark" href="index.html">
+      <img src="images/logo.png" alt="" width="28" height="28" />
+      <span class="logo-text">
+        EvidenceEscrow
+        <span class="logo-tag">on GenLayer</span>
+      </span>
+    </a>
+    <div class="nav-actions">
+      <div class="history-area">
+        <button class="history-btn" id="historyBtn">My deals</button>
+        <div class="history-panel" id="historyPanel"></div>
+      </div>
+      <div class="wallet-area">
+        <button class="wallet-btn" id="walletBtn">Connect wallet</button>
+        <div class="wallet-menu" id="walletMenu">
+          <button id="switchAcctBtn">Switch account</button>
+          <hr/>
+          <button class="danger" id="disconnectBtn">Disconnect</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="nav-links">
+    <a href="about.html">How it works</a>
+    <a href="docs.html" class="current">Docs</a>
+    <a href="privacy.html">Privacy</a>
+  </div>
+</nav>
+
+<article class="prose">
+  <p class="eyebrow" style="display:flex; justify-content:space-between; align-items:center;">
+    <span>Docs</span>
+    <a href="index.html" class="back-home-link">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>
+      Back to homepage
+    </a>
+  </p>
+  <h1>Technical reference</h1>
+  <p class="lede">EvidenceEscrow is a single GenLayer Intelligent Contract, written in Python against the GenVM runtime. This page covers its public interface directly; for the reasoning behind the design, see <a href="about.html">how it works</a>.</p>
+
+  <h2>State machine</h2>
+  <p>Every deal moves through a fixed sequence. The happy path skips the dispute stages entirely, and a cancelled deal can branch off early from either of the first two stages, or from a dispute the payee hasn't responded to yet:</p>
+  <pre style="background:rgba(233,235,231,0.04); border:1px solid var(--line); border-radius:8px; padding:16px; overflow-x:auto; font-family:var(--mono); font-size:12.5px; line-height:1.7; color:#D3D6CE;">AwaitingFunding --fund()--> Funded --confirm_complete()--> Released
+
+Funded --submit_evidence()--> Disputed --resolve_dispute()--> Resolved
+
+AwaitingFunding / Funded / Disputed (payee hasn't responded yet)
+  --cancel_deal()--> Cancelled</pre>
+  <p>Every transition is access-controlled: only the payer can call <code>fund()</code>, <code>confirm_complete()</code>, or <code>cancel_deal()</code>; only the payer or payee can call <code>submit_evidence()</code> or <code>resolve_dispute()</code>. Anyone else is rejected before any AI call happens. <code>cancel_deal()</code> has one extra rule: it stops working the moment the payee has submitted evidence, so it can never be used to make a live claim disappear.</p>
+
+  <h2>Public interface</h2>
+  <table class="doc-table">
+    <thead><tr><th>Method</th><th>Caller</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td><code>__init__(payee, terms)</code></td><td>deployer</td><td>Deploys the deal. The deployer becomes the payer.</td></tr>
+      <tr><td><code>fund()</code> — payable</td><td>payer</td><td>Deposits the escrowed amount. Callable once.</td></tr>
+      <tr><td><code>confirm_complete()</code></td><td>payer</td><td>Releases the full balance to the payee. No dispute, no AI.</td></tr>
+      <tr><td><code>cancel_deal()</code></td><td>payer</td><td>Calls off the deal. Full refund if funds are in escrow. Blocked once the payee has submitted evidence.</td></tr>
+      <tr><td><code>submit_evidence(evidence, evidence_url="")</code></td><td>payer or payee</td><td>Records your side. First call opens the dispute and starts the 24-hour response window.</td></tr>
+      <tr><td><code>resolve_dispute()</code></td><td>payer or payee</td><td>Triggers the AI-arbitrated ruling, once both sides responded or the window has passed.</td></tr>
+      <tr><td><code>get_terms()</code></td><td>anyone</td><td>Returns the plain-language terms.</td></tr>
+      <tr><td><code>get_status()</code></td><td>anyone</td><td>Returns the current state.</td></tr>
+      <tr><td><code>get_parties()</code></td><td>anyone</td><td>Returns the payer and payee addresses.</td></tr>
+      <tr><td><code>get_balance()</code></td><td>anyone</td><td>Returns the current escrowed balance.</td></tr>
+      <tr><td><code>get_evidence()</code></td><td>anyone</td><td>Returns both sides' submitted evidence and links.</td></tr>
+      <tr><td><code>get_ruling()</code></td><td>anyone</td><td>Returns the refund percentage and the model's written reasoning.</td></tr>
+      <tr><td><code>get_dispute_opened_at()</code></td><td>anyone</td><td>Returns when the response window started.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Consensus</h2>
+  <p>The ruling runs through <code>gl.eq_principle.prompt_comparative</code>, with a principle telling validators which field has to match exactly (<code>payer_refund_percent</code>) and which is allowed to vary in wording (<code>reasoning</code>), since no two models explain a decision in identical prose even when they agree on the outcome.</p>
+
+  <h2>Source</h2>
+  <p>Full source, tests, and the complete design write-up live in the repo:</p>
+  <p><a href="https://github.com/Nathbabu/evidence-escrow" target="_blank" rel="noopener">github.com/Nathbabu/evidence-escrow →</a></p>
+</article>
+
+<div class="toast-stack" id="toasts"></div>
+
+<script type="module" src="header.js"></script>
+</body>
+</html>

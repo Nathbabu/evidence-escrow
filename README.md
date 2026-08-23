@@ -4,6 +4,23 @@ A two-party escrow where the release condition is written in plain
 language instead of code, and disputes are settled by GenLayer
 validators reading the evidence rather than by a deterministic check.
 
+**Live:** https://nathbabu.github.io/evidence-escrow/
+**Network:** GenLayer testnet Bradbury
+
+## What's in this repo
+
+- `evidence_escrow.py` — the deal contract itself. A fresh one deploys
+  for every new escrow.
+- `deal_registry.py` — a small, shared contract that keeps a public
+  list of every deal address, so a deal is findable by anyone
+  connecting the right wallet, from any device, not just the browser
+  it was created on.
+- `index.html`, `about.html`, `docs.html`, `privacy.html`, `app.js`,
+  `header.js` — the frontend. Talks to both contracts directly over
+  GenLayer's RPC, no backend server involved anywhere.
+- `test_evidence_escrow.py` — automated tests against
+  `evidence_escrow.py`, using GenLayer's `gltest` framework.
+
 **Revision note:** this went through three rounds of review.
 
 Round 1: a reviewer flagged that the original version let either
@@ -51,6 +68,18 @@ assumed from a single odd result. Switched to sending value through a
 declared evm interface instead, which has been reliable in testing
 since. All four transfer sites, `confirm_complete`, both sides of
 `resolve_dispute`, and `cancel_deal`, now use the same updated pattern.
+
+**Third later addition:** an evidence link submitted by either party
+was being rendered as a clickable link with only HTML-character
+escaping applied, not scheme validation. Escaping quotes and angle
+brackets does nothing to stop a `javascript:` URL from sitting in an
+`href` and running when clicked, since that's a different problem than
+the one escaping solves. An adversarial party in a dispute could have
+planted one for the other side to click. Fixed by validating the
+actual parsed protocol is `http:` or `https:` before anything renders
+as a link; anything else still shows as plain text instead of
+disappearing, so no submitted evidence is silently lost, it just stops
+being something clickable.
 
 ## Why this needs to be an Intelligent Contract
 
@@ -167,6 +196,34 @@ level rather than a structural allow-list.
 | `resolve_dispute()` | payer or payee | Trigger the AI-arbitrated ruling, once both sides responded or the window passed |
 | `get_terms/get_status/get_dispute_opened_at/get_parties/get_balance/get_evidence/get_ruling` | anyone | Read-only state |
 
+## The on-chain registry
+
+`deal_registry.py` is deliberately minimal: `register_deal(address)`
+records a deal address once, with duplicate protection; `get_all_deals()`
+returns the full list; that's the whole contract. It doesn't organize
+entries by wallet, on purpose. The frontend reads the full list and
+checks each deal's real parties directly, keeping the registry itself
+small rather than building a nested storage pattern that had never been
+verified on this runtime.
+
+Creating a deal takes two wallet confirmations: one deploys the escrow,
+a second registers it. Not the original plan. A single-transaction
+version, the escrow registering itself mid-deploy via
+`gl.get_contract_at(...).emit()`, was tested five separate times, each
+one closing a gap the last one left open: whether the outer transaction
+itself was getting stuck (it wasn't), whether the documented `on=`
+syntax mattered (it didn't change the result), whether calling it from
+`__init__` specifically was the problem (moving it to a regular
+post-deploy write call didn't change the result either), and finally,
+following a direct answer from a GenLayer community builder, whether
+the wait was actually anchored to real transaction finalization rather
+than just acceptance (it was, confirmed with nearly 50 minutes of
+patient polling past the real finalization point, and the result still
+didn't change). Every plausible explanation got tested directly rather
+than assumed away. The two-transaction version is what's shipping,
+because it's the one that's actually been proven reliable, not because
+the one-transaction version wasn't tried.
+
 ## Verified in Studio
 
 Both the happy path and the original dispute path were actually
@@ -211,23 +268,20 @@ already checked off.
   the actual test call) on this exact runtime, real output rather
   than documentation written for a different one. The current
   response-window logic is built on that confirmed result.
+- The full both-or-timeout gate has since had its end-to-end run too:
+  a real dispute, left genuinely one-sided, confirmed resolving on
+  that single side's evidence once the actual 24 hours had passed, not
+  just the logic reading correctly in isolation.
 
 ## Known limitations
 
-- **The response window's timeout path is untested against a real
-  clock.** `resolve_dispute()` is confirmed to correctly block when
-  only one side has responded and no time has passed (that's covered
-  by an automated test), and `gl.message_raw["datetime"]` is confirmed
-  to return a real value (via direct probe). What isn't yet confirmed
-  end to end is the combination: that resolution actually proceeds on
-  one-sided evidence once the full 24 hours have genuinely elapsed.
-  That needs either waiting out a real 24 hours in Studio or a way to
-  feed the test suite a mocked transaction datetime, neither of which
-  was done as part of this pass.
 - **No domain allow-list**, discussed above. An intentional scope
   decision for a generic primitive, not an oversight, but worth
   revisiting for any deployment where the deal has a known, narrow set
   of legitimate evidence sources.
+- **The registry has no way to remove an entry.** By design, for now:
+  it's a plain address book, not a moderation system. A cancelled or
+  long-resolved deal stays listed alongside active ones.
 
 ## Running the tests
 
@@ -280,4 +334,7 @@ and reported back the real results. That's what surfaced
 `gl.message`) and confirmed `gl.message_raw["datetime"]` actually
 returns a usable value on this exact runtime. That confirmed result,
 not a second reading of the docs, is what the current timeout logic
-is built on.
+is built on. The registry investigation above followed the same rule:
+when a community answer didn't match what live testing was showing,
+the answer got tested directly rather than trusted or dismissed either
+way.

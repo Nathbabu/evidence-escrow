@@ -52,6 +52,24 @@ import typing
 RESPONSE_WINDOW_SECONDS = 24 * 60 * 60
 
 
+# gl.get_contract_at(addr).emit_transfer(...) technically works and is
+# what this file used originally, but on Bradbury the actual balance
+# move can sit unconfirmed for hours after the transaction itself shows
+# finalized -- watched it happen twice, on two separate refunds, waited
+# each one out fully before ruling it a real problem and not just a
+# slow network. Sending through a declared evm interface instead has
+# been reliable in testing since. Empty View/Write because a wallet
+# has no contract methods of its own; this is only ever used to move
+# value, never to call anything.
+@gl.evm.contract_interface
+class _Recipient:
+    class View:
+        pass
+
+    class Write:
+        pass
+
+
 def _parse_datetime(raw: str) -> datetime.datetime:
     """GenVM reports transaction time as an ISO 8601 string ending in
     'Z'; swap that for an explicit UTC offset so fromisoformat parses
@@ -111,7 +129,7 @@ class EvidenceEscrow(gl.Contract):
         amount = self.balance
         self.status = "Released"
         if amount > u256(0):
-            gl.get_contract_at(self.payee).emit_transfer(value=amount)
+            _Recipient(self.payee).emit_transfer(value=amount)
 
     @gl.public.write
     def cancel_deal(self) -> None:
@@ -138,7 +156,7 @@ class EvidenceEscrow(gl.Contract):
         amount = self.balance
         self.status = "Cancelled"
         if amount > u256(0):
-            gl.get_contract_at(self.payer).emit_transfer(value=amount)
+            _Recipient(self.payer).emit_transfer(value=amount)
 
     @gl.public.write
     def submit_evidence(self, evidence: str, evidence_url: str = "") -> None:
@@ -286,9 +304,9 @@ by a JSON parser without errors.
         self.status = "Resolved"
 
         if refund_amount > u256(0):
-            gl.get_contract_at(self.payer).emit_transfer(value=refund_amount)
+            _Recipient(self.payer).emit_transfer(value=refund_amount)
         if release_amount > u256(0):
-            gl.get_contract_at(self.payee).emit_transfer(value=release_amount)
+            _Recipient(self.payee).emit_transfer(value=release_amount)
 
         return ruling
 

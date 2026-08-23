@@ -419,7 +419,10 @@ body{
 .history-item:last-child{ border-bottom:none; }
 .history-item:hover{ background:rgba(176,141,87,0.08); }
 .history-terms{ font-size:13px; }
-.history-meta{ font-family:var(--mono); font-size:10.5px; color:var(--graphite); letter-spacing:0.03em; }
+.history-meta{ display:flex; align-items:center; gap:8px; }
+.history-address{ font-family:var(--mono); font-size:10.5px; color:var(--graphite); letter-spacing:0.03em; flex:none; }
+.history-status{ font-family:var(--mono); font-size:10.5px; color:var(--graphite); letter-spacing:0.03em; flex:none; min-width:96px; }
+.history-time{ font-family:var(--mono); font-size:10.5px; color:var(--graphite); letter-spacing:0.03em; white-space:nowrap; }
 .history-empty{ padding:20px 16px; font-size:13px; color:var(--graphite); text-align:center; }
 
 /* =======================================================================
@@ -494,6 +497,8 @@ body{
 .active-deals .active-deal-row:first-of-type{ border-top:none; }
 .active-deal-row:hover .active-deal-terms{ color:var(--brass-bright); }
 .active-deal-terms{ font-size:13.5px; transition:color .15s var(--ease); }
+.active-deal-right{ display:flex; align-items:center; gap:10px; flex:none; }
+.active-deal-time{ font-family:var(--mono); font-size:11px; color:var(--graphite); white-space:nowrap; }
 .active-deal-status{ font-family:var(--mono); font-size:10.5px; letter-spacing:0.05em; text-transform:uppercase; white-space:nowrap; padding:3px 9px; border-radius:999px; border:1px solid var(--line-strong); }
 .active-deal-status.status-funded{ color:var(--brass-bright); border-color:rgba(201,166,110,0.4); }
 .active-deal-status.status-disputed{ color:#D98A78; border-color:rgba(140,58,43,0.45); }

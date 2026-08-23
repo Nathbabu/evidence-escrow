@@ -1,0 +1,15 @@
+﻿# Tests & temporary reports
+testsprite_tests/
+TEST_REPORT.md
+TEST_REQUIREMENTS.md
+gitignore
+
+# Throwaway test files -- not part of the submission
+probe*.py
+probe*-test.html
+probe*_b64.txt
+
+# OS and editor cruft
+.DS_Store
+Thumbs.db
+*.swp

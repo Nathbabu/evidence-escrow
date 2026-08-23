@@ -41,6 +41,17 @@ one rule that keeps it safe: it stops working the moment the payee has
 submitted evidence, so it can never be used to make a live claim
 disappear.
 
+**Second later addition:** every payout in this contract originally
+sent value through `gl.get_contract_at(addr).emit_transfer(...)`. It's
+documented as correct, and it passed every test, but on Bradbury the
+actual balance move could sit unconfirmed for hours after the
+transaction itself showed finalized. Confirmed this directly twice,
+watching two separate refunds sit stuck against a real wallet, not
+assumed from a single odd result. Switched to sending value through a
+declared evm interface instead, which has been reliable in testing
+since. All four transfer sites, `confirm_complete`, both sides of
+`resolve_dispute`, and `cancel_deal`, now use the same updated pattern.
+
 ## Why this needs to be an Intelligent Contract
 
 A normal EVM contract can only evaluate things it can compute

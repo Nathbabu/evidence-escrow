@@ -1,114 +1,194 @@
 <!DOCTYPE html>
-<html lang="en">
+<html class="dark" lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>EvidenceEscrow — an escrow that reads the evidence, not just the contract</title>
-<meta name="description" content="A two-party escrow where the release condition is written in plain language, and disputes are settled by GenLayer validators reading the evidence." />
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css">
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>EvidenceEscrow &mdash; AI-powered truth for on-chain deals</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Sora:wght@400;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+<script id="tailwind-config">
+tailwind.config = {
+  darkMode: "class",
+  theme: {
+    extend: {
+      colors: {
+        "surface-container-highest": "#2d3449", "on-tertiary-container": "#494bd7",
+        "primary-fixed": "#7df4ff", "on-secondary-fixed-variant": "#005236",
+        "tertiary-fixed": "#e1e0ff", "error-container": "#93000a",
+        "surface-tint": "#00dbe9", "tertiary-container": "#d7d6ff",
+        "on-tertiary-fixed-variant": "#2f2ebe", "surface-container-lowest": "#060e20",
+        "on-error-container": "#ffdad6", "surface-container-high": "#222a3d",
+        "error": "#ffb4ab", "secondary-container": "#00a572",
+        "outline": "#849495", "primary-container": "#00f0ff",
+        "surface-container": "#171f33", "on-primary-fixed": "#002022",
+        "tertiary-fixed-dim": "#c0c1ff", "on-tertiary": "#1000a9",
+        "inverse-primary": "#006970", "primary": "#dbfcff",
+        "secondary-fixed": "#6ffbbe", "background": "#0b1326",
+        "inverse-on-surface": "#283044", "secondary": "#4edea3",
+        "surface-container-low": "#131b2e", "inverse-surface": "#dae2fd",
+        "on-primary": "#00363a", "surface-variant": "#2d3449",
+        "surface-bright": "#31394d", "outline-variant": "#3b494b",
+        "on-secondary-fixed": "#002113", "on-tertiary-fixed": "#07006c",
+        "on-background": "#dae2fd", "on-secondary": "#003824",
+        "tertiary": "#f8f4ff", "on-primary-fixed-variant": "#004f54",
+        "on-primary-container": "#006970", "primary-fixed-dim": "#00dbe9",
+        "surface-dim": "#0b1326", "secondary-fixed-dim": "#4edea3",
+        "on-secondary-container": "#00311f", "surface": "#0b1326",
+        "on-error": "#690005", "on-surface": "#dae2fd", "on-surface-variant": "#b9cacb"
+      },
+      borderRadius: { DEFAULT: "0.125rem", lg: "0.25rem", xl: "0.5rem", full: "0.75rem" },
+      spacing: { unit: "4px", "margin-mobile": "16px", gutter: "24px", "container-max": "1280px", "margin-desktop": "64px" },
+      fontFamily: {
+        "code-md": ["JetBrains Mono", "monospace"], "headline-lg-mobile": ["Sora", "sans-serif"],
+        "body-sm": ["Inter", "sans-serif"], "label-caps": ["JetBrains Mono", "monospace"],
+        "headline-lg": ["Sora", "sans-serif"], "body-md": ["Inter", "sans-serif"], "headline-md": ["Sora", "sans-serif"]
+      },
+      fontSize: {
+        "code-md": ["14px", { lineHeight: "1.4", letterSpacing: "-0.01em", fontWeight: "500" }],
+        "headline-lg-mobile": ["32px", { lineHeight: "1.2", fontWeight: "700" }],
+        "body-sm": ["14px", { lineHeight: "1.5", fontWeight: "400" }],
+        "label-caps": ["12px", { lineHeight: "1.0", letterSpacing: "0.08em", fontWeight: "700" }],
+        "headline-lg": ["40px", { lineHeight: "1.2", letterSpacing: "-0.02em", fontWeight: "700" }],
+        "body-md": ["16px", { lineHeight: "1.6", fontWeight: "400" }],
+        "headline-md": ["24px", { lineHeight: "1.4", fontWeight: "600" }]
+      }
+    }
+  }
+}
+</script>
+<style>
+.glass-panel{ background:rgba(30,41,59,0.7); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border:1px solid rgba(255,255,255,0.05); }
+.glow-hover:hover{ box-shadow:0 0 15px rgba(219,252,255,0.15); border-color:rgba(255,255,255,0.1); }
+.text-gradient{ background:linear-gradient(to right, #dbfcff, #00dbe9); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+</style>
 </head>
-<body>
+<body class="bg-background text-on-surface font-body-md antialiased min-h-screen flex flex-col relative overflow-x-hidden">
 
-<nav class="site-nav">
-  <div class="nav-top-row">
-    <a class="logo-mark" href="index.html">
-      <img src="images/logo.png" alt="" width="28" height="28" />
-      <span class="logo-text">
-        EvidenceEscrow
-        <span class="logo-tag">on GenLayer</span>
-      </span>
-    </a>
-    <div class="nav-actions">
-      <div class="history-area">
-        <button class="history-btn" id="historyBtn">My deals</button>
-        <div class="history-panel" id="historyPanel"></div>
-      </div>
-      <div class="wallet-area">
-        <button class="wallet-btn" id="walletBtn">Connect wallet</button>
-        <div class="wallet-menu" id="walletMenu">
-          <button id="switchAcctBtn">Switch account</button>
-          <hr/>
-          <button class="danger" id="disconnectBtn">Disconnect</button>
+<header class="fixed top-0 left-0 w-full bg-surface/80 backdrop-blur-md border-b border-white/5 z-50 transition-all">
+  <div class="w-full max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop">
+    <div class="flex justify-between items-center h-16 md:h-20">
+      <a href="index.html" class="flex items-center gap-1.5 sm:gap-2 min-w-0">
+        <img src="images/logo.png" alt="" class="w-6 h-6 md:w-7 md:h-7 flex-none">
+        <span class="font-headline-md text-[15px] md:text-headline-md font-bold text-primary truncate">EvidenceEscrow</span>
+        <span class="hidden sm:inline-block ml-2 font-label-caps text-label-caps bg-surface-container-high px-2 py-1 rounded text-on-surface-variant border border-white/5 whitespace-nowrap">ON GENLAYER</span>
+      </a>
+      <nav class="hidden md:flex items-center gap-8">
+        <a class="text-on-surface-variant font-medium hover:text-primary hover:bg-white/5 transition-colors px-3 py-2 rounded-lg text-body-md" href="about.html">How it works</a>
+        <a class="text-on-surface-variant font-medium hover:text-primary hover:bg-white/5 transition-colors px-3 py-2 rounded-lg text-body-md" href="docs.html">Docs</a>
+        <a class="text-on-surface-variant font-medium hover:text-primary hover:bg-white/5 transition-colors px-3 py-2 rounded-lg text-body-md" href="privacy.html">Privacy</a>
+      </nav>
+      <div class="flex items-center gap-1.5 sm:gap-4 flex-none">
+        <div class="relative history-area">
+          <button id="historyBtn" class="text-on-surface-variant hover:text-primary transition-colors flex items-center gap-1 text-body-md">
+            <span class="material-symbols-outlined text-xl sm:hidden" aria-hidden="true">receipt_long</span>
+            <span class="hidden sm:inline">My deals</span>
+            <span class="material-symbols-outlined text-sm hidden sm:inline" aria-hidden="true">expand_more</span>
+          </button>
+          <div id="historyPanel" class="hidden fixed sm:absolute left-4 right-4 sm:left-auto sm:right-0 top-16 sm:top-full mt-0 sm:mt-2 w-auto sm:w-80 max-h-96 overflow-y-auto bg-surface-container border border-white/10 rounded-lg shadow-lg"></div>
+        </div>
+        <div class="relative wallet-area">
+          <button id="walletBtn" class="bg-primary text-on-primary font-label-caps text-[10px] sm:text-label-caps px-2.5 sm:px-4 py-2 rounded-full shadow-[inset_0_1px_0_rgba(255,255,255,0.4)] hover:brightness-110 transition-all flex items-center gap-1 sm:gap-2 whitespace-nowrap">
+            <span class="material-symbols-outlined text-sm" aria-hidden="true">account_balance_wallet</span><span class="hidden sm:inline">Connect wallet</span>
+          </button>
+          <div id="walletMenu" class="hidden fixed sm:absolute left-4 right-4 sm:left-auto sm:right-0 top-16 sm:top-full mt-0 sm:mt-2 w-auto sm:w-44 bg-surface-container border border-white/10 rounded-lg shadow-lg overflow-hidden">
+            <div id="walletMenuBalance" class="sm:hidden px-4 py-3 border-b border-white/5 font-code-md text-code-md text-on-surface"></div>
+            <button id="switchAcctBtn" class="w-full text-left px-4 py-3 font-body-sm text-body-sm text-on-surface hover:bg-white/5 transition-colors">Switch account</button>
+            <hr class="border-white/5">
+            <button id="disconnectBtn" class="w-full text-left px-4 py-3 font-body-sm text-body-sm text-error hover:bg-white/5 transition-colors">Disconnect</button>
+          </div>
         </div>
       </div>
     </div>
+    <nav class="flex md:hidden items-center justify-center gap-6 pb-3">
+      <a class="text-on-surface-variant hover:text-primary text-sm" href="about.html">How it works</a>
+      <a class="text-on-surface-variant hover:text-primary text-sm" href="docs.html">Docs</a>
+      <a class="text-on-surface-variant hover:text-primary text-sm" href="privacy.html">Privacy</a>
+    </nav>
   </div>
-  <div class="nav-links">
-    <a href="about.html">How it works</a>
-    <a href="docs.html">Docs</a>
-    <a href="privacy.html">Privacy</a>
-  </div>
-</nav>
+</header>
 
-<div id="heroBlock">
-  <section class="hero">
-    <p class="eyebrow">A GenLayer Intelligent Contract</p>
-    <h1 class="hero-h1">The escrow that reads<br/>the evidence, <em>not just the contract.</em></h1>
-    <p class="hero-lede">Name what needs to happen, in plain English. If both sides agree it did, funds move instantly. If they don't, GenLayer validators read what each side actually submits, evidence and all, and rule on a fair split. No judge, no arbitration firm, no waiting weeks.</p>
-    <div class="hero-cta">
-      <a href="#app" id="launchBtn" class="btn btn-primary btn-lg">Start an escrow</a>
-      <a href="about.html" class="btn btn-quiet btn-lg">See how it works</a>
-    </div>
-    <div id="heroActiveDeals" style="margin-top:28px;"></div>
-  </section>
+<main id="landingMain" class="flex-grow relative z-10 w-full max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop flex flex-col gap-4 py-4 pt-36 md:pt-28">
 
-  <div class="section-divider" style="margin:56px auto;"></div>
-
-  <section class="how-steps">
-    <p class="section-label">How a case moves</p>
-    <div class="step-grid">
-      <div class="step-card">
-        <span class="step-num">01</span>
-        <h3>File the deal</h3>
-        <p>Payer names the payee and writes the terms in plain language, then deposits the funds. Nothing leaves escrow until this is settled.</p>
+  <section id="heroBlock" class="grid grid-cols-1 lg:grid-cols-12 gap-gutter items-center py-12">
+    <div class="col-span-1 lg:col-span-6 flex flex-col gap-8">
+      <div class="inline-flex items-center gap-2 bg-surface-container-high border border-white/5 px-3 py-1.5 rounded-full w-max">
+        <span class="w-2 h-2 rounded-full bg-secondary shadow-[0_0_8px_rgba(78,222,163,0.5)]"></span>
+        <span class="font-code-md text-code-md text-secondary">Trusted dispute resolution on GenLayer</span>
       </div>
-      <div class="step-card">
-        <span class="step-num">02</span>
-        <h3>Agree, or don't</h3>
-        <p>If both sides agree it's done, one click releases the full amount. No AI, no waiting, no dispute needed.</p>
-      </div>
-      <div class="step-card">
-        <span class="step-num">03</span>
-        <h3>If not, evidence decides</h3>
-        <p>Each side submits their account, plus an optional link. GenLayer validators independently read it and rule on a refund split, not a guess.</p>
+      <h1 class="font-headline-md text-headline-md text-on-surface tracking-tight">The escrow that reads <br><span class="text-gradient">the evidence, not just the contract</span></h1>
+      <p class="font-body-md text-body-md text-on-surface-variant max-w-lg leading-relaxed">Name what needs to happen, in plain English. If both sides agree it did, funds move instantly. If they don't, GenLayer validators read what each side actually submits, evidence and all, and rule on a fair split. No judge, no arbitration firm, no waiting weeks.</p>
+      <div class="flex flex-col sm:flex-row gap-4 mt-4">
+        <button id="launchBtn" class="bg-primary text-on-primary font-label-caps text-label-caps px-8 py-4 rounded-full shadow-[inset_0_1px_0_rgba(255,255,255,0.4)] hover:brightness-110 transition-all flex items-center justify-center gap-2">
+          Start an escrow <span class="material-symbols-outlined text-sm" aria-hidden="true">arrow_forward</span>
+        </button>
+        <a href="about.html" class="border border-primary text-primary font-label-caps text-label-caps px-8 py-4 rounded-full hover:bg-primary/5 transition-all flex items-center justify-center gap-2">See how it works</a>
       </div>
     </div>
-  </section>
-
-  <div class="section-divider" style="margin:56px auto;"></div>
-
-  <section class="proof">
-    <p class="section-label">Real rulings, not a mockup</p>
-    <div class="proof-grid">
-      <div class="proof-card weak">
-        <div class="proof-pct">50%</div>
-        <div class="proof-tag">Vague claim, both sides</div>
-        <p>Terms were "test6." Payer said "not delivered," payee said "finished on time," neither backed it up. The ruling split the funds evenly, and said exactly why: no evidence, no way to determine fault.</p>
-        <div class="proof-evidence">No links, no proof, either side.</div>
+    <div class="col-span-1 lg:col-span-6 relative">
+      <div class="glass-panel rounded-xl glow-hover transition-all duration-300 p-6">
+        <div class="flex items-center justify-between mb-6 border-b border-white/5 pb-4">
+          <h3 class="font-label-caps text-label-caps text-on-surface">How a case moves</h3>
+          <span class="material-symbols-outlined text-on-surface-variant" aria-hidden="true">account_tree</span>
+        </div>
+        <div class="space-y-5">
+          <div class="flex gap-4">
+            <div class="w-8 h-8 rounded-full bg-surface-container-high border border-white/10 flex items-center justify-center shrink-0"><span class="font-label-caps text-[11px] text-primary">01</span></div>
+            <div><p class="font-body-md text-body-md text-on-surface mb-1">File the deal</p><p class="font-body-sm text-body-sm text-on-surface-variant">Payer names the payee and writes the terms in plain language, then deposits the funds. Nothing leaves escrow until this is settled.</p></div>
+          </div>
+          <div class="flex gap-4">
+            <div class="w-8 h-8 rounded-full bg-surface-container-high border border-white/10 flex items-center justify-center shrink-0"><span class="font-label-caps text-[11px] text-primary">02</span></div>
+            <div><p class="font-body-md text-body-md text-on-surface mb-1">Agree, or don't</p><p class="font-body-sm text-body-sm text-on-surface-variant">If both sides agree it's done, one click releases the full amount. No AI, no waiting, no dispute needed.</p></div>
+          </div>
+          <div class="flex gap-4">
+            <div class="w-8 h-8 rounded-full bg-surface-container-high border border-error/30 flex items-center justify-center shrink-0"><span class="font-label-caps text-[11px] text-error">03</span></div>
+            <div><p class="font-body-md text-body-md text-on-surface mb-1">If not, evidence decides</p><p class="font-body-sm text-body-sm text-on-surface-variant">Each side submits their account, plus an optional link. GenLayer validators independently read it and rule on a refund split, not a guess.</p></div>
+          </div>
+        </div>
       </div>
-      <div class="proof-card strong">
-        <div class="proof-pct">0%</div>
-        <div class="proof-tag">Same denial, real proof this time</div>
-        <p>Same bare payer denial as the case above. But the payee backed their claim with an actual public link this time. The model read the linked page, named specific content from it, and ruled in full.</p>
-        <div class="proof-evidence">One side proved it. That's the whole incentive.</div>
-      </div>
+      <div class="absolute -bottom-6 -left-6 w-24 h-24 bg-primary/20 rounded-full blur-3xl -z-10"></div>
+      <div class="absolute -top-6 -right-6 w-32 h-32 bg-secondary/10 rounded-full blur-3xl -z-10"></div>
     </div>
   </section>
 
-  <div class="hero-footer">
-    <div class="close-line"></div>
-    <p>A GenLayer Intelligent Contract — built, reviewed, and running on Testnet Bradbury</p>
-  </div>
-</div>
+  <div id="heroActiveDeals"></div>
 
-<main class="wrap" id="app">
-  <!-- populated by render() -->
+  <section id="proofSection" class="py-8">
+    <h2 class="font-headline-md text-headline-md text-on-surface mb-2">Real rulings, not a mockup</h2>
+    <p class="font-body-sm text-body-sm text-on-surface-variant mb-8">Two real disputes, same vague denial, different amount of proof.</p>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div class="glass-panel rounded-xl p-6 border-l-4 border-l-error">
+        <div class="flex items-baseline gap-2 mb-2">
+          <span class="font-headline-lg text-headline-lg text-error">50%</span>
+        </div>
+        <p class="font-label-caps text-label-caps text-on-surface-variant uppercase mb-4">Vague claim, both sides</p>
+        <p class="font-body-sm text-body-sm text-on-surface leading-relaxed mb-4">Terms were &ldquo;test6.&rdquo; Payer said &ldquo;not delivered,&rdquo; payee said &ldquo;finished on time,&rdquo; neither backed it up. The ruling split the funds evenly, and said exactly why: no evidence, no way to determine fault.</p>
+        <p class="font-body-sm text-body-sm text-on-surface-variant italic">No links, no proof, either side.</p>
+      </div>
+      <div class="glass-panel rounded-xl p-6 border-l-4 border-l-secondary">
+        <div class="flex items-baseline gap-2 mb-2">
+          <span class="font-headline-lg text-headline-lg text-secondary">0%</span>
+        </div>
+        <p class="font-label-caps text-label-caps text-on-surface-variant uppercase mb-4">Same denial, real proof this time</p>
+        <p class="font-body-sm text-body-sm text-on-surface leading-relaxed mb-4">Same bare payer denial as the case above. But the payee backed their claim with an actual public link this time. The model read the linked content, named specific parts of it, and ruled in full.</p>
+        <p class="font-body-sm text-body-sm text-secondary">One side proved it. Funds then moved instantly.</p>
+      </div>
+    </div>
+  </section>
+
 </main>
 
-<div class="toast-stack" id="toasts"></div>
+<div id="app" class="w-full max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop pt-36 md:pt-28 relative z-10"></div>
+
+<footer class="w-full border-t border-white/5 bg-surface-container-lowest mt-auto relative z-10">
+  <div class="w-full max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop py-8 flex flex-col items-center gap-2 text-on-surface-variant">
+    <p class="font-body-sm text-body-sm text-center">A GenLayer Intelligent Contract &mdash; built, reviewed, and running on testnet Bradbury.</p>
+  </div>
+</footer>
+
+<div id="toasts" class="fixed bottom-6 right-6 z-[100] flex flex-col gap-2"></div>
 
 <script type="module" src="header.js"></script>
 <script type="module" src="app.js"></script>

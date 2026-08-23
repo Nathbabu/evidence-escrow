@@ -1,98 +1,279 @@
 <!DOCTYPE html>
-<html lang="en">
+<html class="dark" lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Docs — EvidenceEscrow</title>
-<meta name="description" content="Technical reference for the EvidenceEscrow contract: public interface, state machine, and source." />
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css">
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Docs &mdash; EvidenceEscrow</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Sora:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+<script id="tailwind-config">
+tailwind.config = {
+  darkMode: "class",
+  theme: {
+    extend: {
+      colors: {
+        "surface-container-highest": "#2d3449", "on-tertiary-container": "#494bd7",
+        "primary-fixed": "#7df4ff", "on-secondary-fixed-variant": "#005236",
+        "tertiary-fixed": "#e1e0ff", "error-container": "#93000a",
+        "surface-tint": "#00dbe9", "tertiary-container": "#d7d6ff",
+        "on-tertiary-fixed-variant": "#2f2ebe", "surface-container-lowest": "#060e20",
+        "on-error-container": "#ffdad6", "surface-container-high": "#222a3d",
+        "error": "#ffb4ab", "secondary-container": "#00a572",
+        "outline": "#849495", "primary-container": "#00f0ff",
+        "surface-container": "#171f33", "on-primary-fixed": "#002022",
+        "tertiary-fixed-dim": "#c0c1ff", "on-tertiary": "#1000a9",
+        "inverse-primary": "#006970", "primary": "#dbfcff",
+        "secondary-fixed": "#6ffbbe", "background": "#0b1326",
+        "inverse-on-surface": "#283044", "secondary": "#4edea3",
+        "surface-container-low": "#131b2e", "inverse-surface": "#dae2fd",
+        "on-primary": "#00363a", "surface-variant": "#2d3449",
+        "surface-bright": "#31394d", "outline-variant": "#3b494b",
+        "on-secondary-fixed": "#002113", "on-tertiary-fixed": "#07006c",
+        "on-background": "#dae2fd", "on-secondary": "#003824",
+        "tertiary": "#f8f4ff", "on-primary-fixed-variant": "#004f54",
+        "on-primary-container": "#006970", "primary-fixed-dim": "#00dbe9",
+        "surface-dim": "#0b1326", "secondary-fixed-dim": "#4edea3",
+        "on-secondary-container": "#00311f", "surface": "#0b1326",
+        "on-error": "#690005", "on-surface": "#dae2fd", "on-surface-variant": "#b9cacb"
+      },
+      borderRadius: { DEFAULT: "0.125rem", lg: "0.25rem", xl: "0.5rem", full: "0.75rem" },
+      spacing: { unit: "4px", "margin-mobile": "16px", gutter: "24px", "container-max": "1280px", "margin-desktop": "64px" },
+      fontFamily: {
+        "code-md": ["JetBrains Mono", "monospace"], "headline-lg-mobile": ["Sora", "sans-serif"],
+        "body-sm": ["Inter", "sans-serif"], "label-caps": ["JetBrains Mono", "monospace"],
+        "headline-lg": ["Sora", "sans-serif"], "body-md": ["Inter", "sans-serif"], "headline-md": ["Sora", "sans-serif"]
+      },
+      fontSize: {
+        "code-md": ["14px", { lineHeight: "1.4", letterSpacing: "-0.01em", fontWeight: "500" }],
+        "headline-lg-mobile": ["32px", { lineHeight: "1.2", fontWeight: "700" }],
+        "body-sm": ["14px", { lineHeight: "1.5", fontWeight: "400" }],
+        "label-caps": ["12px", { lineHeight: "1.0", letterSpacing: "0.08em", fontWeight: "700" }],
+        "headline-lg": ["40px", { lineHeight: "1.2", letterSpacing: "-0.02em", fontWeight: "700" }],
+        "body-md": ["16px", { lineHeight: "1.6", fontWeight: "400" }],
+        "headline-md": ["24px", { lineHeight: "1.4", fontWeight: "600" }]
+      }
+    }
+  }
+}
+</script>
+<style>
+.glow-hover:hover{ box-shadow:0 0 15px rgba(219,252,255,0.15); border-color:rgba(219,252,255,0.5); }
+.glass-panel{ background-color:rgba(30,41,59,0.8); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); }
+</style>
 </head>
-<body>
+<body class="bg-surface text-on-surface font-body-md text-body-md antialiased min-h-screen flex flex-col relative overflow-x-hidden">
 
-<nav class="site-nav">
-  <div class="nav-top-row">
-    <a class="logo-mark" href="index.html">
-      <img src="images/logo.png" alt="" width="28" height="28" />
-      <span class="logo-text">
-        EvidenceEscrow
-        <span class="logo-tag">on GenLayer</span>
-      </span>
-    </a>
-    <div class="nav-actions">
-      <div class="history-area">
-        <button class="history-btn" id="historyBtn">My deals</button>
-        <div class="history-panel" id="historyPanel"></div>
-      </div>
-      <div class="wallet-area">
-        <button class="wallet-btn" id="walletBtn">Connect wallet</button>
-        <div class="wallet-menu" id="walletMenu">
-          <button id="switchAcctBtn">Switch account</button>
-          <hr/>
-          <button class="danger" id="disconnectBtn">Disconnect</button>
+<header class="fixed top-0 left-0 w-full bg-surface/80 backdrop-blur-md border-b border-white/5 z-50">
+  <div class="w-full max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop">
+    <div class="h-16 md:h-20 flex justify-between items-center">
+      <a href="index.html" class="flex items-center gap-1.5 sm:gap-2 min-w-0">
+        <img src="images/logo.png" alt="" class="w-6 h-6 md:w-7 md:h-7 flex-none">
+        <span class="font-headline-md text-[15px] md:text-headline-md font-bold text-primary truncate">EvidenceEscrow</span>
+        <span class="hidden sm:inline-block ml-2 font-label-caps text-label-caps bg-surface-container-high px-2 py-1 rounded text-on-surface-variant border border-white/5 whitespace-nowrap">ON GENLAYER</span>
+      </a>
+      <nav class="hidden md:flex items-center gap-8">
+        <a class="text-on-surface-variant font-medium hover:text-primary hover:bg-white/5 transition-colors px-3 py-2 rounded-lg text-body-md" href="about.html">How it works</a>
+        <a class="text-primary font-bold border-b-2 border-primary pb-1 px-3 py-2 text-body-md" href="docs.html">Docs</a>
+        <a class="text-on-surface-variant font-medium hover:text-primary hover:bg-white/5 transition-colors px-3 py-2 rounded-lg text-body-md" href="privacy.html">Privacy</a>
+      </nav>
+      <div class="flex items-center gap-1.5 sm:gap-4 flex-none">
+        <div class="relative history-area">
+          <button id="historyBtn" class="text-on-surface-variant hover:text-primary transition-colors flex items-center gap-1 text-body-md">
+            <span class="material-symbols-outlined text-xl sm:hidden" aria-hidden="true">receipt_long</span>
+            <span class="hidden sm:inline">My deals</span>
+            <span class="material-symbols-outlined text-sm hidden sm:inline" aria-hidden="true">expand_more</span>
+          </button>
+          <div id="historyPanel" class="hidden fixed sm:absolute left-4 right-4 sm:left-auto sm:right-0 top-16 sm:top-full mt-0 sm:mt-2 w-auto sm:w-80 max-h-96 overflow-y-auto bg-surface-container border border-white/10 rounded-lg shadow-lg"></div>
+        </div>
+        <div class="relative wallet-area">
+          <button id="walletBtn" class="bg-primary text-on-primary font-label-caps text-[10px] sm:text-label-caps px-2.5 sm:px-4 py-2 rounded-full shadow-[inset_0_1px_0_rgba(255,255,255,0.4)] hover:brightness-110 transition-all flex items-center gap-1 sm:gap-2 whitespace-nowrap">
+            <span class="material-symbols-outlined text-sm" aria-hidden="true">account_balance_wallet</span><span class="hidden sm:inline">Connect wallet</span>
+          </button>
+          <div id="walletMenu" class="hidden fixed sm:absolute left-4 right-4 sm:left-auto sm:right-0 top-16 sm:top-full mt-0 sm:mt-2 w-auto sm:w-44 bg-surface-container border border-white/10 rounded-lg shadow-lg overflow-hidden">
+            <div id="walletMenuBalance" class="sm:hidden px-4 py-3 border-b border-white/5 font-code-md text-code-md text-on-surface"></div>
+            <button id="switchAcctBtn" class="w-full text-left px-4 py-3 font-body-sm text-body-sm text-on-surface hover:bg-white/5 transition-colors">Switch account</button>
+            <hr class="border-white/5">
+            <button id="disconnectBtn" class="w-full text-left px-4 py-3 font-body-sm text-body-sm text-error hover:bg-white/5 transition-colors">Disconnect</button>
+          </div>
         </div>
       </div>
     </div>
+    <nav class="flex md:hidden items-center justify-center gap-6 pb-3">
+      <a class="text-on-surface-variant hover:text-primary text-sm" href="about.html">How it works</a>
+      <a class="text-primary font-bold text-sm" href="docs.html">Docs</a>
+      <a class="text-on-surface-variant hover:text-primary text-sm" href="privacy.html">Privacy</a>
+    </nav>
   </div>
-  <div class="nav-links">
-    <a href="about.html">How it works</a>
-    <a href="docs.html" class="current">Docs</a>
-    <a href="privacy.html">Privacy</a>
+</header>
+
+<main class="flex-grow w-full mt-28 md:mt-20 py-12 relative z-10">
+  <div class="w-full max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop flex flex-col gap-12 md:gap-24">
+
+    <header class="max-w-3xl">
+      <h1 class="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-lg md:text-headline-lg mb-4 text-primary">Technical reference</h1>
+      <p class="text-on-surface-variant">The deal's state machine, the contract's real public interface, and how the AI consensus mechanism actually works.</p>
+    </header>
+
+    <section>
+      <div class="flex items-center gap-3 mb-6">
+        <span class="material-symbols-outlined text-primary" aria-hidden="true">account_tree</span>
+        <h2 class="font-headline-md text-headline-md">Deal flow state machine</h2>
+      </div>
+      <div class="bg-surface-container rounded-lg p-6 border border-white/5 glass-panel relative overflow-hidden">
+        <div class="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent pointer-events-none"></div>
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center relative z-10 gap-6 md:gap-0 mb-8">
+          <div class="flex flex-col items-center relative w-full md:w-auto group">
+            <div class="w-14 h-14 rounded-full bg-surface-container-high border-2 border-primary flex items-center justify-center mb-3 shadow-[0_0_15px_rgba(219,252,255,0.15)]">
+              <span class="material-symbols-outlined text-primary" aria-hidden="true">upload_file</span>
+            </div>
+            <span class="font-label-caps text-label-caps text-primary">Filed</span>
+          </div>
+          <div class="hidden md:block h-[2px] flex-grow bg-outline-variant mx-2"></div>
+          <div class="flex flex-col items-center relative w-full md:w-auto group">
+            <div class="w-14 h-14 rounded-full bg-surface-container-high border-2 border-outline-variant flex items-center justify-center mb-3">
+              <span class="material-symbols-outlined text-on-surface-variant" aria-hidden="true">account_balance_wallet</span>
+            </div>
+            <span class="font-label-caps text-label-caps text-on-surface-variant">Funded</span>
+          </div>
+          <div class="hidden md:block h-[2px] flex-grow bg-outline-variant mx-2"></div>
+          <div class="flex flex-col items-center relative w-full md:w-auto group">
+            <div class="w-14 h-14 rounded-full bg-surface-container-high border-2 border-error flex items-center justify-center mb-3">
+              <span class="material-symbols-outlined text-error" aria-hidden="true">gavel</span>
+            </div>
+            <span class="font-label-caps text-label-caps text-error">Disputed</span>
+          </div>
+          <div class="hidden md:block h-[2px] flex-grow bg-outline-variant mx-2"></div>
+          <div class="flex flex-col items-center relative w-full md:w-auto group">
+            <div class="w-14 h-14 rounded-full bg-surface-container-high border-2 border-secondary flex items-center justify-center mb-3">
+              <span class="material-symbols-outlined text-secondary" aria-hidden="true">verified</span>
+            </div>
+            <span class="font-label-caps text-label-caps text-secondary">Resolved</span>
+          </div>
+        </div>
+        <div class="border-t border-white/5 pt-6 flex items-center gap-3">
+          <span class="material-symbols-outlined text-outline-variant" aria-hidden="true">cancel</span>
+          <p class="font-body-sm text-body-sm text-on-surface-variant"><code class="font-code-md text-error">cancel_deal()</code> can branch off from Filed, Funded, or an early Disputed state where the payee hasn't responded yet, straight to a fifth state, <span class="text-error font-code-md">Cancelled</span>, refunding the payer in full if the deal was already funded.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="flex items-center gap-3 mb-6">
+        <span class="material-symbols-outlined text-primary" aria-hidden="true">integration_instructions</span>
+        <h2 class="font-headline-md text-headline-md">Public interface</h2>
+      </div>
+      <div class="bg-surface-container rounded-lg border border-white/5 overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="bg-surface-container-high border-b border-white/5">
+              <th class="py-4 px-6 font-label-caps text-label-caps text-on-surface-variant">Method</th>
+              <th class="py-4 px-6 font-label-caps text-label-caps text-on-surface-variant">Caller</th>
+              <th class="py-4 px-6 font-label-caps text-label-caps text-on-surface-variant">Purpose</th>
+            </tr>
+          </thead>
+          <tbody class="font-code-md text-code-md text-on-surface divide-y divide-white/5">
+            <tr class="hover:bg-white/5 transition-colors">
+              <td class="py-4 px-6 text-primary">__init__(payee, terms)</td>
+              <td class="py-4 px-6"><span class="bg-white/10 text-on-surface px-2 py-1 rounded text-xs">deployer</span></td>
+              <td class="py-4 px-6 font-body-sm text-body-sm text-on-surface-variant">Deploys the deal. The deployer becomes the payer.</td>
+            </tr>
+            <tr class="hover:bg-white/5 transition-colors">
+              <td class="py-4 px-6 text-primary">fund()</td>
+              <td class="py-4 px-6"><span class="bg-primary/10 text-primary px-2 py-1 rounded text-xs border border-primary/30">payer</span></td>
+              <td class="py-4 px-6 font-body-sm text-body-sm text-on-surface-variant">Deposits the escrowed amount, payable, callable once.</td>
+            </tr>
+            <tr class="hover:bg-white/5 transition-colors">
+              <td class="py-4 px-6 text-primary">confirm_complete()</td>
+              <td class="py-4 px-6"><span class="bg-primary/10 text-primary px-2 py-1 rounded text-xs border border-primary/30">payer</span></td>
+              <td class="py-4 px-6 font-body-sm text-body-sm text-on-surface-variant">Releases the full balance to the payee. No dispute, no AI.</td>
+            </tr>
+            <tr class="hover:bg-white/5 transition-colors">
+              <td class="py-4 px-6 text-error">cancel_deal()</td>
+              <td class="py-4 px-6"><span class="bg-primary/10 text-primary px-2 py-1 rounded text-xs border border-primary/30">payer</span></td>
+              <td class="py-4 px-6 font-body-sm text-body-sm text-on-surface-variant">Calls off the deal, full refund if funded. Blocked once the payee has submitted evidence.</td>
+            </tr>
+            <tr class="hover:bg-white/5 transition-colors">
+              <td class="py-4 px-6 text-primary">submit_evidence(evidence, evidence_url)</td>
+              <td class="py-4 px-6"><span class="bg-secondary/10 text-secondary px-2 py-1 rounded text-xs border border-secondary/30">payer/payee</span></td>
+              <td class="py-4 px-6 font-body-sm text-body-sm text-on-surface-variant">Records your side. First call opens the dispute and starts the 24-hour response window.</td>
+            </tr>
+            <tr class="hover:bg-white/5 transition-colors">
+              <td class="py-4 px-6 text-primary">resolve_dispute()</td>
+              <td class="py-4 px-6"><span class="bg-secondary/10 text-secondary px-2 py-1 rounded text-xs border border-secondary/30">payer/payee</span></td>
+              <td class="py-4 px-6 font-body-sm text-body-sm text-on-surface-variant">Triggers the AI-arbitrated ruling, once both sides responded or the window passed.</td>
+            </tr>
+            <tr class="hover:bg-white/5 transition-colors">
+              <td class="py-4 px-6 text-tertiary-fixed-dim">get_terms / get_status / get_parties / get_balance / get_evidence / get_ruling / get_dispute_opened_at</td>
+              <td class="py-4 px-6"><span class="bg-tertiary-fixed-dim/10 text-tertiary-fixed-dim px-2 py-1 rounded text-xs border border-tertiary-fixed-dim/30">anyone</span></td>
+              <td class="py-4 px-6 font-body-sm text-body-sm text-on-surface-variant">Read-only state.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <div>
+        <div class="flex items-center gap-3 mb-6">
+          <span class="material-symbols-outlined text-primary" aria-hidden="true">psychology</span>
+          <h2 class="font-headline-md text-headline-md">AI consensus mechanism</h2>
+        </div>
+        <div class="space-y-4 text-on-surface-variant font-body-md text-body-md">
+          <p>The ruling runs through <code class="font-code-md text-primary">gl.eq_principle.prompt_comparative</code>, GenLayer's equivalence-principle mechanism for consensus over language-based judgments.</p>
+          <p>The principle tells validators which field has to match exactly, <code class="font-code-md text-primary">payer_refund_percent</code>, and which is allowed to vary in wording, <code class="font-code-md text-primary">reasoning</code>, since no two models explain a decision in identical prose even when they agree on the outcome.</p>
+        </div>
+      </div>
+      <div class="bg-[#0b1326] border border-white/5 rounded-lg overflow-hidden flex flex-col glow-hover transition-all duration-300">
+        <div class="bg-surface-container-high px-4 py-2 border-b border-white/5 flex items-center justify-between">
+          <span class="font-label-caps text-label-caps text-on-surface-variant">cancel_deal() &mdash; the real thing</span>
+          <div class="flex space-x-2">
+            <div class="w-3 h-3 rounded-full bg-error/50"></div>
+            <div class="w-3 h-3 rounded-full bg-secondary/50"></div>
+            <div class="w-3 h-3 rounded-full bg-primary/50"></div>
+          </div>
+        </div>
+        <div class="p-6 overflow-x-auto font-code-md text-code-md text-on-surface-variant">
+<pre><code><span class="text-secondary">@gl.public.write</span>
+<span class="text-secondary">def</span> <span class="text-primary">cancel_deal</span>(self) -&gt; <span class="text-tertiary-fixed-dim">None</span>:
+    <span class="text-secondary">if</span> gl.message.sender_address != self.payer:
+        <span class="text-secondary">raise</span> gl.vm.UserError(<span class="text-error">"Only the payer can cancel"</span>)
+    allowed = self.status <span class="text-secondary">in</span> (<span class="text-error">"AwaitingFunding"</span>, <span class="text-error">"Funded"</span>) <span class="text-secondary">or</span> (
+        self.status == <span class="text-error">"Disputed"</span> <span class="text-secondary">and not</span> self.payee_evidence
+    )
+    <span class="text-secondary">if not</span> allowed:
+        <span class="text-secondary">raise</span> gl.vm.UserError(<span class="text-error">"Cannot cancel once the payee has submitted evidence"</span>)
+    amount = self.balance
+    self.status = <span class="text-error">"Cancelled"</span>
+    <span class="text-secondary">if</span> amount &gt; u256(<span class="text-tertiary-fixed-dim">0</span>):
+        _Recipient(self.payer).emit_transfer(value=amount)</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="flex items-center gap-3 mb-6">
+        <span class="material-symbols-outlined text-primary" aria-hidden="true">source</span>
+        <h2 class="font-headline-md text-headline-md">Source</h2>
+      </div>
+      <p class="text-on-surface-variant mb-4">Full source, tests, and the complete design write-up live in the repo:</p>
+      <a href="https://github.com/Nathbabu/evidence-escrow" target="_blank" rel="noopener" class="inline-flex items-center gap-2 border border-primary text-primary font-label-caps text-label-caps px-6 py-3 rounded hover:bg-primary/5 transition-all">
+        <span class="material-symbols-outlined text-lg" aria-hidden="true">code</span> github.com/Nathbabu/evidence-escrow
+      </a>
+    </section>
+
   </div>
-</nav>
+</main>
 
-<article class="prose">
-  <p class="eyebrow" style="display:flex; justify-content:space-between; align-items:center;">
-    <span>Docs</span>
-    <a href="index.html" class="back-home-link">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>
-      Back to homepage
-    </a>
-  </p>
-  <h1>Technical reference</h1>
-  <p class="lede">EvidenceEscrow is a single GenLayer Intelligent Contract, written in Python against the GenVM runtime. This page covers its public interface directly; for the reasoning behind the design, see <a href="about.html">how it works</a>.</p>
+<footer class="w-full mt-auto bg-surface-container-lowest border-t border-white/5">
+  <div class="w-full max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop py-8 flex flex-col items-center gap-2 text-on-surface-variant">
+    <p class="font-body-sm text-body-sm text-center">A GenLayer Intelligent Contract &mdash; built, reviewed, and running on testnet Bradbury.</p>
+  </div>
+</footer>
 
-  <h2>State machine</h2>
-  <p>Every deal moves through a fixed sequence. The happy path skips the dispute stages entirely, and a cancelled deal can branch off early from either of the first two stages, or from a dispute the payee hasn't responded to yet:</p>
-  <pre style="background:rgba(233,235,231,0.04); border:1px solid var(--line); border-radius:8px; padding:16px; overflow-x:auto; font-family:var(--mono); font-size:12.5px; line-height:1.7; color:#D3D6CE;">AwaitingFunding --fund()--> Funded --confirm_complete()--> Released
-
-Funded --submit_evidence()--> Disputed --resolve_dispute()--> Resolved
-
-AwaitingFunding / Funded / Disputed (payee hasn't responded yet)
-  --cancel_deal()--> Cancelled</pre>
-  <p>Every transition is access-controlled: only the payer can call <code>fund()</code>, <code>confirm_complete()</code>, or <code>cancel_deal()</code>; only the payer or payee can call <code>submit_evidence()</code> or <code>resolve_dispute()</code>. Anyone else is rejected before any AI call happens. <code>cancel_deal()</code> has one extra rule: it stops working the moment the payee has submitted evidence, so it can never be used to make a live claim disappear.</p>
-
-  <h2>Public interface</h2>
-  <table class="doc-table">
-    <thead><tr><th>Method</th><th>Caller</th><th>Purpose</th></tr></thead>
-    <tbody>
-      <tr><td><code>__init__(payee, terms)</code></td><td>deployer</td><td>Deploys the deal. The deployer becomes the payer.</td></tr>
-      <tr><td><code>fund()</code> — payable</td><td>payer</td><td>Deposits the escrowed amount. Callable once.</td></tr>
-      <tr><td><code>confirm_complete()</code></td><td>payer</td><td>Releases the full balance to the payee. No dispute, no AI.</td></tr>
-      <tr><td><code>cancel_deal()</code></td><td>payer</td><td>Calls off the deal. Full refund if funds are in escrow. Blocked once the payee has submitted evidence.</td></tr>
-      <tr><td><code>submit_evidence(evidence, evidence_url="")</code></td><td>payer or payee</td><td>Records your side. First call opens the dispute and starts the 24-hour response window.</td></tr>
-      <tr><td><code>resolve_dispute()</code></td><td>payer or payee</td><td>Triggers the AI-arbitrated ruling, once both sides responded or the window has passed.</td></tr>
-      <tr><td><code>get_terms()</code></td><td>anyone</td><td>Returns the plain-language terms.</td></tr>
-      <tr><td><code>get_status()</code></td><td>anyone</td><td>Returns the current state.</td></tr>
-      <tr><td><code>get_parties()</code></td><td>anyone</td><td>Returns the payer and payee addresses.</td></tr>
-      <tr><td><code>get_balance()</code></td><td>anyone</td><td>Returns the current escrowed balance.</td></tr>
-      <tr><td><code>get_evidence()</code></td><td>anyone</td><td>Returns both sides' submitted evidence and links.</td></tr>
-      <tr><td><code>get_ruling()</code></td><td>anyone</td><td>Returns the refund percentage and the model's written reasoning.</td></tr>
-      <tr><td><code>get_dispute_opened_at()</code></td><td>anyone</td><td>Returns when the response window started.</td></tr>
-    </tbody>
-  </table>
-
-  <h2>Consensus</h2>
-  <p>The ruling runs through <code>gl.eq_principle.prompt_comparative</code>, with a principle telling validators which field has to match exactly (<code>payer_refund_percent</code>) and which is allowed to vary in wording (<code>reasoning</code>), since no two models explain a decision in identical prose even when they agree on the outcome.</p>
-
-  <h2>Source</h2>
-  <p>Full source, tests, and the complete design write-up live in the repo:</p>
-  <p><a href="https://github.com/Nathbabu/evidence-escrow" target="_blank" rel="noopener">github.com/Nathbabu/evidence-escrow →</a></p>
-</article>
-
-<div class="toast-stack" id="toasts"></div>
+<div id="toasts" class="fixed bottom-6 right-6 z-[100] flex flex-col gap-2"></div>
 
 <script type="module" src="header.js"></script>
 </body>
